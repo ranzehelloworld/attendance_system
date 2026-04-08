@@ -19,49 +19,49 @@ const attendanceRef = ref(db, 'attendance/' + DATE_ID);
 
 let records = [];
 
-// 2. STUDENT DATA
+// 2. MASTERLIST
 const DEFAULT_STUDENTS = [
-  { id: '25-0321', name: 'Jemica Arceo', initials: 'JA' },
-  { id: '25-0032', name: 'Bryan Apostol', initials: 'BA' },
-  { id: '25-0319', name: 'Jush Ancheta', initials: 'JA' },
-  { id: '25-0293', name: 'Kezia Balubar', initials: 'KB' },
-  { id: '25-0461', name: 'Jamil Bayabao', initials: 'JB' },
-  { id: '25-0328', name: 'Jeremy Besa', initials: 'JB' },
-  { id: '25-0193', name: 'Princess Bergonia', initials: 'PB' },
-  { id: '25-0157', name: 'Julian Bello', initials: 'JB' },
-  { id: '25-0294', name: 'Christian Jeff Bricia', initials: 'CB' },
-  { id: '25-0158', name: 'Jester Bumanglag', initials: 'JB' },
-  { id: '25-0332', name: 'King Jb Cabasag', initials: 'JB' },
-  { id: '25-0194', name: 'Alyssa Cacal', initials: 'AC' },
-  { id: '25-0195', name: 'Darlene Cabreros', initials: 'DC' },
-  { id: '25-0807', name: 'Roger Carpio', initials: 'RC' },
-  { id: '25-0302', name: 'Rose Cañeza', initials: 'RC' },
-  { id: '25-0841', name: 'Aldrin Dela Cruz', initials: 'AD' },
-  { id: '25-0209', name: 'Ivy Del Rosario', initials: 'ID' },
-  { id: '25-0876', name: 'Cesar Faustino', initials: 'CF' },
-  { id: '25-0292', name: 'Edelyn Fernandez', initials: 'EF' },
-  { id: '25-0356', name: 'Andrew Gaudan', initials: 'AG' },
-  { id: '25-0349', name: 'Prince Jhon Olvidado', initials: 'PJ' },
-  { id: '25-0350', name: 'Christopher Madamba', initials: 'CM' },
-  { id: '25-0182', name: 'Darwin Magbual', initials: 'DM' },
-  { id: '25-0288', name: 'Oyo Boy Martinez', initials: 'OM' },
-  { id: '25-0359', name: 'Amelia Julian', initials: 'AJ' },
-  { id: '25-0171', name: 'Francis John Pinto', initials: 'FP' },
-  { id: '25-0361', name: 'Krisjay Portugal', initials: 'KP' },
-  { id: '25-0460', name: 'Melmar Ranque', initials: 'MR' },
-  { id: '25-0942', name: 'Adrian Ramos', initials: 'AR' },
-  { id: '25-0327', name: 'Ellaisa Ramos', initials: 'ER' },
-  { id: '25-0947', name: 'Aaron Reyes', initials: 'AR' },
-  { id: '25-0310', name: 'Mark Ruel Santiago', initials: 'MS' },
-  { id: '25-0181', name: 'Jaypee Santos', initials: 'JS' },
-  { id: '25-0330', name: 'Erica Soto', initials: 'ES' },
-  { id: '25-0337', name: 'Maria Hezekiah Mae Still', initials: 'MH' },
-  { id: '25-0842', name: 'Paul Junarc Tayag', initials: 'PT' },
-  { id: '25-0344', name: 'May Ann Tadeo', initials: 'MT' },
-  { id: '25-0761', name: 'Mark Angelo Tolentino', initials: 'AT' },
-  { id: '25-0320', name: 'Aisha Viñas', initials: 'AV' },
-  { id: '25-0341', name: 'Rhian Villanueva', initials: 'RV' },
-  { id: '25-0751', name: 'Reymond Estardo', initials: 'RE' },
+  { id: '1', name: 'Jemica Arceo', initials: 'JA' },
+  { id: '2', name: 'Bryan Apostol', initials: 'BA' },
+  { id: '3', name: 'Jush Ancheta', initials: 'JA' },
+  { id: '4', name: 'Kezia Balubar', initials: 'KB' },
+  { id: '5', name: 'Jamil Bayabao', initials: 'JB' },
+  { id: '6', name: 'Jeremy Besa', initials: 'JB' },
+  { id: '7', name: 'Princess Bergonia', initials: 'PB' },
+  { id: '8', name: 'Julian Bello', initials: 'JB' },
+  { id: '9', name: 'Christian Jeff Bricia', initials: 'CB' },
+  { id: '10', name: 'Jester Bumanglag', initials: 'JB' },
+  { id: '11', name: 'King Jb Cabasag', initials: 'JB' },
+  { id: '12', name: 'Alyssa Cacal', initials: 'AC' },
+  { id: '13', name: 'Darlene Cabreros', initials: 'DC' },
+  { id: '14', name: 'Roger Carpio', initials: 'RC' },
+  { id: '15', name: 'Rose Cañeza', initials: 'RC' },
+  { id: '16', name: 'Aldrin Dela Cruz', initials: 'AD' },
+  { id: '17', name: 'Ivy Del Rosario', initials: 'ID' },
+  { id: '18', name: 'Cesar Faustino', initials: 'CF' },
+  { id: '19', name: 'Edelyn Fernandez', initials: 'EF' },
+  { id: '20', name: 'Andrew Gaudan', initials: 'AG' },
+  { id: '21', name: 'Prince Jhon Olvidado', initials: 'PJ' },
+  { id: '22', name: 'Christopher Madamba', initials: 'CM' },
+  { id: '23', name: 'Darwin Magbual', initials: 'DM' },
+  { id: '24', name: 'Oyo Boy Martinez', initials: 'OM' },
+  { id: '25', name: 'Amelia Julian', initials: 'AJ' },
+  { id: '26', name: 'Francis John Pinto', initials: 'FP' },
+  { id: '27', name: 'Krisjay Portugal', initials: 'KP' },
+  { id: '28', name: 'Melmar Ranque', initials: 'MR' },
+  { id: '29', name: 'Adrian Ramos', initials: 'AR' },
+  { id: '30', name: 'Ellaisa Ramos', initials: 'ER' },
+  { id: '31', name: 'Aaron Reyes', initials: 'AR' },
+  { id: '32', name: 'Mark Ruel Santiago', initials: 'MS' },
+  { id: '33', name: 'Jaypee Santos', initials: 'JS' },
+  { id: '34', name: 'Erica Soto', initials: 'ES' },
+  { id: '35', name: 'Maria Hezekiah Mae Still', initials: 'MH' },
+  { id: '36', name: 'Paul Junarc Tayag', initials: 'PT' },
+  { id: '37', name: 'May Ann Tadeo', initials: 'MT' },
+  { id: '38', name: 'Mark Angelo Tolentino', initials: 'AT' },
+  { id: '39', name: 'Aisha Viñas', initials: 'AV' },
+  { id: '40', name: 'Rhian Villanueva', initials: 'RV' },
+  { id: '41', name: 'Reymond Estardo', initials: 'RE' },
 ];
 
 // 3. HELPERS
@@ -106,9 +106,9 @@ window.filterStudents = function() {
 
 window.exportCSV = function() {
   const event = document.getElementById('event-name').value || 'Attendance';
-  let csv = "Name,ID,Status,In,Out\n";
+  let csv = "Name,Status,In,Out\n";
   records.forEach(r => {
-    csv += `"${r.name}",${r.id},${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
+    csv += `"${r.name}",${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
   });
   const link = document.createElement("a");
   link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
@@ -134,7 +134,6 @@ function renderTable() {
           </div>
           <div>
             <div class="font-headline text-on-surface group-hover:text-primary transition-colors">${rec.name}</div>
-            <div class="text-[0.65rem] font-label text-outline uppercase tracking-wider">ID: #${rec.id}</div>
           </div>
         </div>
       </td>
