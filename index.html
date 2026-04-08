@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" type="image/png" href="logo.png">
+<title>BSIT 1C | Attendance Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+
+  /* This allows you to swipe left/right on the table on a phone */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Prevents names from wrapping into tiny vertical columns */
+td {
+  white-space: nowrap;
+}
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .retro-input-focus:focus { outline: none; border-bottom: 2px solid #f4be55; background: rgba(244,190,85,0.05); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0c0e10; }
+  ::-webkit-scrollbar-thumb { background: #282a2c; border-radius: 10px; }
+
+  .toast {
+    position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;
+    background: #1e2022; border: 1px solid rgba(244,190,85,0.3);
+    color: #f4be55; padding: 0.75rem 1.5rem; border-radius: 0.5rem;
+    font-family: 'Manrope', sans-serif; font-size: 0.75rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    transform: translateY(100px); opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .row-present td { background: rgba(183,205,176,0.04) !important; }
+  .row-absent td { background: rgba(0,0,0,0) !important; }
+</style>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "surface-variant":"#333537","on-primary":"#412d00","secondary":"#b7cdb0","surface-dim":"#121416",
+          "surface-container-high":"#282a2c","surface-container-low":"#1a1c1e","surface-bright":"#37393b",
+          "on-secondary-fixed-variant":"#394c36","error-container":"#93000a","primary-fixed-dim":"#f4be55",
+          "on-primary-fixed-variant":"#5e4200","on-tertiary":"#5b1a00","on-secondary-container":"#a6bb9f",
+          "on-secondary-fixed":"#0e1f0d","error":"#ffb4ab","on-surface":"#e2e2e5","primary-container":"#513800",
+          "inverse-primary":"#7c5800","secondary-fixed":"#d3e9cb","primary":"#f4be55","on-error":"#690005",
+          "surface-container-lowest":"#0c0e10","on-primary-container":"#d19f39","on-secondary":"#233521",
+          "primary-fixed":"#ffdea7","inverse-on-surface":"#2f3133","on-background":"#e2e2e5","surface":"#121416",
+          "tertiary-container":"#702200","secondary-container":"#394c36","on-tertiary-fixed":"#380d00",
+          "background":"#121416","inverse-surface":"#e2e2e5","on-surface-variant":"#c4c6cd",
+          "on-primary-fixed":"#271900","tertiary-fixed":"#ffdbcf","tertiary":"#ffb59b",
+          "surface-container-highest":"#333537","tertiary-fixed-dim":"#ffb59b","on-tertiary-fixed-variant":"#812800",
+          "secondary-fixed-dim":"#b7cdb0","outline-variant":"#43474c","outline":"#8e9197","surface-tint":"#f4be55",
+          "surface-container":"#1e2022","on-error-container":"#ffdad6","on-tertiary-container":"#ff8557"
+        },
+        borderRadius: { DEFAULT:"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem" },
+        fontFamily: { headline:["Space Grotesk"], body:["Manrope"], label:["Manrope"] }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-x-hidden min-h-screen">
+
+<div id="toast" class="toast"></div>
+
+<div class="min-h-screen flex flex-col justify-center items-center px-6 py-12">
+<main class="w-full max-w-5xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-12 text-center">
+    <h1 class="text-3xl font-headline font-bold text-[#f4be55] tracking-[0.2em] uppercase" id="org-name">BSIT 1C</h1>
+    <p class="text-outline text-[0.6rem] tracking-[0.4em] uppercase mt-2">Isabela State University • Attendance System</p>
+  </div>
+
+  <!-- Event + Clock -->
+  <section class="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
+    <div class="flex-1">
+      <label class="font-label text-[0.6875rem] uppercase tracking-[0.2em] text-outline mb-2 block">Event</label>
+      <input id="event-name" class="w-full bg-transparent border-none border-b-2 border-surface-container-highest text-2xl md:text-3xl font-headline font-medium text-on-surface py-2 px-0 retro-input-focus transition-all duration-300"
+        placeholder="Enter event name..." type="text" value="Flag Ceremony Attendance"/>
+    </div>
+    <div class="bg-surface-container-lowest px-6 py-4 rounded-lg flex items-center space-x-6 border border-outline-variant/5 shadow-xl">
+      <div class="text-right">
+        <div class="text-xs font-label uppercase tracking-widest text-outline">Time</div>
+        <div class="font-headline text-xl text-primary flex items-center">
+          <span id="clock-time" class="mr-2">--:--</span>
+          <span id="clock-ampm" class="text-[0.6rem] opacity-70">--</span>
+        </div>
+      </div>
+      <div class="h-8 w-[1px] bg-outline-variant/20"></div>
+      <div>
+        <div class="text-xs font-label uppercase tracking-widest text-outline">Date</div>
+        <div class="font-headline text-lg text-on-surface" id="clock-date">--</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Attendance Card -->
+  <section class="bg-surface-container rounded-xl overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.6)] relative">
+
+    <!-- Card Header -->
+    <div class="px-8 py-6 border-b border-outline-variant/10 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-surface-container-low gap-4">
+      <div>
+        <h3 class="font-headline text-xl text-on-surface font-semibold tracking-tight">Attendance List</h3>
+        <p class="text-xs text-outline font-label tracking-wide uppercase mt-1">BSIT 1C • <span id="total-count">0</span> Students Enrolled</p>
+      </div>
+      <div class="flex space-x-3 w-full sm:w-auto">
+<button onclick="exportCSV()" class="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-surface-container-highest px-4 py-2 rounded text-xs font-label uppercase tracking-wider hover:bg-surface-bright transition-colors">
+  <span class="material-symbols-outlined text-sm">csv</span>
+  <span>Export CSV</span>
+</button>
+<div class="relative w-full sm:w-64">
+  <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+  <input type="text" id="student-search" placeholder="Search name or ID..." 
+    class="w-full bg-surface-container-highest border-none rounded-lg py-2 pl-10 pr-4 text-xs font-label text-on-surface focus:ring-1 focus:ring-primary transition-all"
+    oninput="filterStudents()">
+</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-surface-container-lowest">
+            <th class="px-8 py-4 font-label text-[0.65rem] uppercase tracking-[0.15em] text-outline">Name</th>
+            <th class="px-8 py-4 font-label text-[0.65rem] uppercase tracking-[0.15em] text-outline text-right pr-8">Attendance</th>
+          </tr>
+        </thead>
+        <tbody id="student-table-body" class="divide-y divide-outline-variant/5">
+          <!-- Rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-surface-container-lowest px-8 py-6 flex flex-wrap items-center justify-between gap-6 border-t border-outline-variant/10">
+      <div class="flex items-center space-x-8">
+        <div class="flex items-center space-x-3">
+          <div class="w-3 h-3 rounded-full bg-secondary shadow-[0_0_8px_rgba(183,205,176,0.6)]"></div>
+          <span class="font-label text-[0.65rem] uppercase tracking-widest text-outline">Present: <span id="stat-present" class="text-on-surface font-bold text-sm ml-1">0</span></span>
+        </div>
+        <div class="flex items-center space-x-3">
+          <div class="w-3 h-3 rounded-full bg-tertiary shadow-[0_0_8px_rgba(255,181,155,0.6)]"></div>
+          <span class="font-label text-[0.65rem] uppercase tracking-widest text-outline">Absent: <span id="stat-absent" class="text-on-surface font-bold text-sm ml-1">0</span></span>
+        </div>
+      </div>
+      <div class="flex-1 flex justify-center">
+        <div class="bg-surface-container-high px-4 py-2 rounded-full flex items-center space-x-4">
+          <div class="text-[0.6rem] font-label uppercase tracking-widest text-outline">Attendance Rate</div>
+          <div class="h-1.5 w-32 bg-surface-variant rounded-full overflow-hidden">
+            <div id="rate-bar" class="h-full bg-primary rounded-full shadow-[0_0_10px_rgba(244,190,85,0.4)] transition-all duration-500" style="width:0%"></div>
+          </div>
+          <div id="stat-rate" class="text-xs font-headline font-bold text-primary">0%</div>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <div class="mt-12 text-center">
+    <p class="text-outline text-[0.6rem] uppercase tracking-[0.3em] opacity-40">1C Attendance System Version 4.8.26 • Section-Based Attendance • Mama mo blue</p>
+  </div>
+</main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
