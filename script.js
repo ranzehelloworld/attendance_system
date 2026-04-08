@@ -5,6 +5,7 @@ import { getDatabase, ref, set, onValue } from "firebase/database";
 const firebaseConfig = {
   apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
   authDomain: "bsit-1c-attendance.firebaseapp.com",
+  databaseURL: "https://bsit-1c-attendance-default-rtdb.asia-southeast1.firebasedatabase.app", // ADD THIS LINE
   projectId: "bsit-1c-attendance",
   storageBucket: "bsit-1c-attendance.firebasestorage.app",
   messagingSenderId: "935043253740",
