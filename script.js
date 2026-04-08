@@ -86,11 +86,12 @@ function saveData(data) {
 window.handleTimeCheck = function(id, field, checked) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
+  
   const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
   rec[checkedField] = checked;
   rec[field] = checked ? now12h() : '';
   
-  saveData(records);
+  saveData(records); // This pushes to Firebase
   updateStats();
   showToast(checked ? `Attendance Recorded` : `Attendance Removed`);
 }
@@ -192,29 +193,30 @@ function updateClock() {
 
 // 7. INITIALIZATION & SYNC
 onValue(attendanceRef, (snapshot) => {
-  const data = snapshot.val();
-  if (data) {
-    records = data; 
-  } else {
-    // Initial sort by last name if cloud is empty
-    const sorted = [...DEFAULT_STUDENTS].sort((a, b) => {
-        const nameA = a.name.split(" ").pop().toLowerCase();
-        const nameB = b.name.split(" ").pop().toLowerCase();
-        return nameA < nameB ? -1 : 1;
-    });
-    records = sorted.map(s => ({
-      ...s,
-      timeInChecked: false, timeIn: '',
-      timeOutChecked: false, timeOut: ''
-    }));
-  }
-  renderTable(); 
+    const data = snapshot.val();
+    if (data) {
+        records = data; 
+    } else {
+        const sorted = [...DEFAULT_STUDENTS].sort((a, b) => {
+            const nameA = a.name.split(" ").pop().toLowerCase();
+            const nameB = b.name.split(" ").pop().toLowerCase();
+            return nameA < nameB ? -1 : 1;
+        });
+        records = sorted.map(s => ({
+            ...s,
+            timeInChecked: false, timeIn: '',
+            timeOutChecked: false, timeOut: ''
+        }));
+    }
+    renderTable(); // This is the most important part—it draws the table once data arrives
 });
 
 setInterval(updateClock, 1000);
 updateClock();
 
 const eventEl = document.getElementById('event-name');
-eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
-const saved = localStorage.getItem('attendance_event_name');
-if (saved) eventEl.value = saved;
+if (eventEl) {
+    eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
+    const saved = localStorage.getItem('attendance_event_name');
+    if (saved) eventEl.value = saved;
+}
