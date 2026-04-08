@@ -143,7 +143,7 @@ function renderTable() {
           <div class="flex flex-col items-center gap-1">
             <span class="text-[0.5rem] text-outline uppercase">In</span>
             <label class="relative inline-flex items-center cursor-pointer scale-90">
-              <input type="checkbox" class="sr-only peer" ${rec.timeInChecked ? 'checked' : ''} onchange="handleTimeCheck('${rec.id}', 'timeIn', this.checked)">
+              <input type="checkbox" class="sr-only peer" ${rec.timeInChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeIn', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
             <input class="bg-transparent border-none text-[0.7rem] w-16 text-center text-secondary" value="${rec.timeIn}" placeholder="--:--" readonly>
@@ -151,7 +151,7 @@ function renderTable() {
           <div class="flex flex-col items-center gap-1">
             <span class="text-[0.5rem] text-outline uppercase">Out</span>
             <label class="relative inline-flex items-center cursor-pointer scale-90">
-              <input type="checkbox" class="sr-only peer" ${rec.timeOutChecked ? 'checked' : ''} onchange="handleTimeCheck('${rec.id}', 'timeOut', this.checked)">
+              <input type="checkbox" class="sr-only peer" ${rec.timeOutChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeOut', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tertiary"></div>
             </label>
             <input class="bg-transparent border-none text-[0.7rem] w-16 text-center text-on-surface-variant" value="${rec.timeOut}" placeholder="--:--" readonly>
