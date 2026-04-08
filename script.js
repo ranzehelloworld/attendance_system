@@ -1,7 +1,24 @@
-// 1. DATA CONFIG
-const DATE_ID = new Date().toISOString().slice(0, 10); 
-const STORAGE_KEY = `attendance_bsit1c_v1.4${DATE_ID}`;
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, set, onValue } from "firebase/database";
 
+// 1. FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
+  authDomain: "bsit-1c-attendance.firebaseapp.com",
+  projectId: "bsit-1c-attendance",
+  storageBucket: "bsit-1c-attendance.firebasestorage.app",
+  messagingSenderId: "935043253740",
+  appId: "1:935043253740:web:c48c12af9d07b22eee2cc9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const DATE_ID = new Date().toISOString().slice(0, 10);
+const attendanceRef = ref(db, 'attendance/' + DATE_ID);
+
+let records = [];
+
+// 2. STUDENT DATA
 const DEFAULT_STUDENTS = [
   { id: '25-0321', name: 'Jemica Arceo', initials: 'JA' },
   { id: '25-0032', name: 'Bryan Apostol', initials: 'BA' },
@@ -46,7 +63,7 @@ const DEFAULT_STUDENTS = [
   { id: '25-0751', name: 'Reymond Estardo', initials: 'RE' },
 ];
 
-// 2. HELPERS
+// 3. HELPERS
 function initials(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -59,64 +76,25 @@ function now12h() {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
-// 3. CORE DATA LOGIC
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
-  
-  // 1. Create a copy of the default list so we don't mess up the original
-  const sortedDefault = [...DEFAULT_STUDENTS].sort((a, b) => {
-    // 2. Extract the last name for both students
-    const nameA = a.name.split(" ").pop().toLowerCase();
-    const nameB = b.name.split(" ").pop().toLowerCase();
-    
-    // 3. Compare them alphabetically
-    if (nameA < nameB) return -1;
-    if (nameA > nameB) return 1;
-    return 0;
-  });
-  
-  // 4. Return the mapped records
-  return sortedDefault.map(s => ({
-    ...s,
-    timeInChecked: false,
-    timeIn: '',
-    timeOutChecked: false,
-    timeOut: '',
-  }));
-}
-
+// 4. CORE DATA LOGIC
 function saveData(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch(e) {}
+  set(attendanceRef, data);
 }
 
-// 4. HANDLERS
-function handleTimeCheck(id, field, checked) {
+// 5. HANDLERS
+window.handleTimeCheck = function(id, field, checked) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
   rec[checkedField] = checked;
   rec[field] = checked ? now12h() : '';
   
-  // Update UI Input directly
-  const input = document.querySelector(`[data-${field.toLowerCase()}="${id}"]`);
-  if (input) input.value = rec[field];
-
   saveData(records);
   updateStats();
   showToast(checked ? `Attendance Recorded` : `Attendance Removed`);
 }
 
-function updateRecord(id, field, value) {
-  const rec = records.find(r => r.id === id);
-  if (rec) { rec[field] = value; saveData(records); }
-}
-
-function filterStudents() {
+window.filterStudents = function() {
   const query = document.getElementById('student-search').value.toLowerCase();
   const rows = document.querySelectorAll('#student-table-body tr');
   rows.forEach(row => {
@@ -124,14 +102,25 @@ function filterStudents() {
   });
 }
 
-// 5. RENDER LOGIC
+window.exportCSV = function() {
+  const event = document.getElementById('event-name').value || 'Attendance';
+  let csv = "Name,ID,Status,In,Out\n";
+  records.forEach(r => {
+    csv += `"${r.name}",${r.id},${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
+  });
+  const link = document.createElement("a");
+  link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+  link.download = `BSIT 1C ${event} Attendance ${DATE_ID}.csv`;
+  link.click();
+}
+
+// 6. RENDER LOGIC
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  records.forEach((rec, i) => {
-// Use the manual initials if they exist, otherwise calculate them
+  records.forEach((rec) => {
     const init = rec.initials || initials(rec.name);
     const tr = document.createElement('tr');
     tr.className = "hover:bg-surface-container-high transition-colors group";
@@ -155,7 +144,7 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeInChecked ? 'checked' : ''} onchange="handleTimeCheck('${rec.id}', 'timeIn', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
-            <input data-timein="${rec.id}" class="bg-transparent border-none text-[0.7rem] w-16 text-center text-secondary" value="${rec.timeIn}" placeholder="--:--" readonly>
+            <input class="bg-transparent border-none text-[0.7rem] w-16 text-center text-secondary" value="${rec.timeIn}" placeholder="--:--" readonly>
           </div>
           <div class="flex flex-col items-center gap-1">
             <span class="text-[0.5rem] text-outline uppercase">Out</span>
@@ -163,7 +152,7 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeOutChecked ? 'checked' : ''} onchange="handleTimeCheck('${rec.id}', 'timeOut', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tertiary"></div>
             </label>
-            <input data-timeout="${rec.id}" class="bg-transparent border-none text-[0.7rem] w-16 text-center text-on-surface-variant" value="${rec.timeOut}" placeholder="--:--" readonly>
+            <input class="bg-transparent border-none text-[0.7rem] w-16 text-center text-on-surface-variant" value="${rec.timeOut}" placeholder="--:--" readonly>
           </div>
         </div>
       </td>`;
@@ -182,22 +171,12 @@ function updateStats() {
   document.getElementById('rate-bar').style.width = `${rate}%`;
 }
 
-function exportCSV() {
-  const event = document.getElementById('event-name').value || 'Attendance';
-  let csv = "Name,ID,Status,In,Out\n";
-  records.forEach(r => {
-    csv += `"${r.name}",${r.id},${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
-  });
-  const link = document.createElement("a");
-  link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-  link.download = `BSIT 1C ${event} Attendance ${DATE_ID}.csv`;
-  link.click();
-}
-
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  if(t) {
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
 }
 
 function updateClock() {
@@ -210,13 +189,30 @@ function updateClock() {
   document.getElementById('clock-date').textContent = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-// 6. INITIALIZATION (The engine starts here)
-let records = loadData(); 
+// 7. INITIALIZATION & SYNC
+onValue(attendanceRef, (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    records = data; 
+  } else {
+    // Initial sort by last name if cloud is empty
+    const sorted = [...DEFAULT_STUDENTS].sort((a, b) => {
+        const nameA = a.name.split(" ").pop().toLowerCase();
+        const nameB = b.name.split(" ").pop().toLowerCase();
+        return nameA < nameB ? -1 : 1;
+    });
+    records = sorted.map(s => ({
+      ...s,
+      timeInChecked: false, timeIn: '',
+      timeOutChecked: false, timeOut: ''
+    }));
+  }
+  renderTable(); 
+});
+
 setInterval(updateClock, 1000);
 updateClock();
-renderTable();
 
-// Event Name persistence
 const eventEl = document.getElementById('event-name');
 eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
 const saved = localStorage.getItem('attendance_event_name');
