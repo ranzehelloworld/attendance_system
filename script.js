@@ -248,15 +248,27 @@ function showToast(msg) {
   }
 }
 
+// 6. RENDER LOGIC (CLOCK & STATS)
 function updateClock() {
   const d = new Date();
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM';
+  
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
-  document.getElementById('clock-time').textContent = `${String(h).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+
+  // Added :${String(d.getSeconds()).padStart(2,'0')} for the ticking effect
+  const timeString = `${String(h).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  
+  // Updating your specific HTML IDs
+  document.getElementById('clock-time').textContent = timeString;
   document.getElementById('clock-ampm').textContent = ampm;
   document.getElementById('clock-date').textContent = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
+
+// Start the real-time loop
+setInterval(updateClock, 1000);
+updateClock(); // Run immediately so it doesn't show "--:--" for the first second
 
 // 7. INITIALIZATION & SYNC
 onValue(attendanceRef, (snapshot) => {
