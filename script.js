@@ -124,7 +124,7 @@ window.exportPDF = function() {
     // 1. Load and Add Logo
     // We use a small 'stamp' size (20mm x 20mm)
     const img = new Image();
-    img.src = 'logo.png'; 
+    img.src = 'iict-logo.png'; 
     
     // addImage(img, format, x, y, width, height)
     doc.addImage(img, 'PNG', 14, 10, 20, 20);
@@ -133,7 +133,7 @@ window.exportPDF = function() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(244, 190, 85); // Gold
-    doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20); // X increased to 38
+    doc.text("BSIT 1C | ATTENDANCE", 38, 20); // X increased to 38
 
     doc.setFontSize(10);
     doc.setTextColor(100); 
@@ -178,7 +178,7 @@ window.exportPDF = function() {
         }
     });
 
-    doc.save(`BSIT1C_${eventName}_${DATE_ID}.pdf`);
+    doc.save(`BSIT 1C ${eventName} ${DATE_ID}.pdf`);
 };
 
 
