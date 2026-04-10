@@ -118,8 +118,15 @@ window.exportCSV = function() {
 }
 
 window.exportPDF = function() {
-    // We removed the old "const { jsPDF }" line from here
-    const doc = new jsPDF();
+    // 1. Initialize doc
+    const doc = new jsPDF(); 
+    
+    // 2. IMPORTANT: Manually link the autotable plugin (since it's a module)
+    if (typeof doc.autoTable !== 'function') {
+        console.error("AutoTable plugin not found. Make sure the script is loaded in HTML.");
+        return;
+    }
+    
     const eventName = document.getElementById('event-name').value || 'Attendance';
 
     // 1. PDF Header Styling
