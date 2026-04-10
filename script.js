@@ -50,13 +50,10 @@ function initials(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-// Function for the timestamp in the table (HH:MM AM/PM)
-function now12h() {
+// Function for static timestamp when checkbox is clicked
+function getStaticTime() {
   const d = new Date();
-  let h = d.getHours(), m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // 4. CORE DATA LOGIC
@@ -70,7 +67,7 @@ window.handleTimeCheck = function(id, field, checked) {
   if (!rec) return;
   const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
   rec[checkedField] = checked;
-  rec[field] = checked ? now12h() : '';
+  rec[field] = checked ? getStaticTime() : '';
   saveData(records);
   updateStats();
   showToast(checked ? `Attendance Recorded` : `Attendance Removed`);
@@ -197,19 +194,27 @@ function showToast(msg) {
   }
 }
 
-// THE CLOCK LOGIC
+// THE LIVE CLOCK LOGIC (Matches your PHP example)
 function updateClock() {
-  const d = new Date();
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  
-  // Update time with seconds
-  const timeStr = `${String(h).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
-  
-  document.getElementById('clock-time').textContent = timeStr;
-  document.getElementById('clock-ampm').textContent = ampm;
-  document.getElementById('clock-date').textContent = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    const now = new Date();
+    
+    // Format for the main clock display (12-hour with seconds)
+    const timeParts = now.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+    }).split(' ');
+
+    const timeString = timeParts[0]; // The HH:MM:SS part
+    const ampm = timeParts[1];       // The AM/PM part
+
+    document.getElementById('clock-time').innerText = timeString;
+    document.getElementById('clock-ampm').innerText = ampm;
+
+    // Format for the Date display
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', options);
 }
 
 // 7. INITIALIZATION
@@ -218,18 +223,17 @@ onValue(attendanceRef, (snapshot) => {
     if (data) {
         records = data; 
     } else {
-        // Sort masterlist alphabetically by last name for better UX
         records = [...DEFAULT_STUDENTS].sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
           .map(s => ({ ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
     }
     renderTable();
 });
 
-// Run clock once and then every second
+// Run clock immediately and set the live interval
 updateClock();
 setInterval(updateClock, 1000);
 
-// Event Name persistence
+// Persistence for Event Name
 const eventEl = document.getElementById('event-name');
 if (eventEl) {
     eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
