@@ -118,7 +118,7 @@ window.exportPDF = function() {
 
         doc.autoTable({
             startY: 40,
-            head: [['Student Name', 'Status', 'Time In', 'Time Out']],
+            head: [['Name', 'Status', 'Time In', 'Time Out']],
             body: tableData,
             theme: 'grid',
             headStyles: { fillColor: [156, 77, 185], halign: 'center' },
@@ -128,7 +128,7 @@ window.exportPDF = function() {
                 }
             }
         });
-        doc.save(`BSIT1C_${eventName}_${DATE_ID}.pdf`);
+        doc.save(`BSIT 1C ${eventName} Attendance ${DATE_ID}.pdf`);
     };
 };
 
@@ -194,7 +194,7 @@ function showToast(msg) {
   }
 }
 
-// THE LIVE CLOCK LOGIC (Matches your PHP example)
+// LIVE CLOCK
 function updateClock() {
     const now = new Date();
     
