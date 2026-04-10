@@ -1,3 +1,4 @@
+const { jsPDF } = window.jspdf;
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
 
@@ -117,7 +118,7 @@ window.exportCSV = function() {
 }
 
 window.exportPDF = function() {
-    const { jsPDF } = window.jspdf;
+    // We removed the old "const { jsPDF }" line from here
     const doc = new jsPDF();
     const eventName = document.getElementById('event-name').value || 'Attendance';
 
