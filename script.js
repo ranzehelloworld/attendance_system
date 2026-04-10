@@ -118,29 +118,29 @@ window.exportCSV = function() {
 }
 
 window.exportPDF = function() {
-    // 1. Initialize doc
-    const doc = new jsPDF(); 
-    
-    // 2. IMPORTANT: Manually link the autotable plugin (since it's a module)
-    if (typeof doc.autoTable !== 'function') {
-        console.error("AutoTable plugin not found. Make sure the script is loaded in HTML.");
-        return;
-    }
-    
+    const doc = new jsPDF();
     const eventName = document.getElementById('event-name').value || 'Attendance';
 
-    // 1. PDF Header Styling
+    // 1. Load and Add Logo
+    // We use a small 'stamp' size (20mm x 20mm)
+    const img = new Image();
+    img.src = 'logo.png'; 
+    
+    // addImage(img, format, x, y, width, height)
+    doc.addImage(img, 'PNG', 14, 10, 20, 20);
+
+    // 2. Report Header (Moved to the right of the logo)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.setTextColor(244, 190, 85); // Matches your #f4be55 Gold
-    doc.text("BSIT 1C | ATTENDANCE REPORT", 14, 20);
+    doc.setTextColor(244, 190, 85); // Gold
+    doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20); // X increased to 38
 
     doc.setFontSize(10);
-    doc.setTextColor(100); // Grey text
-    doc.text(`Event: ${eventName}`, 14, 30);
-    doc.text(`Date: ${DATE_ID}`, 14, 35);
+    doc.setTextColor(100); 
+    doc.text(`Event: ${eventName}`, 38, 27);
+    doc.text(`Date: ${DATE_ID}`, 38, 32);
 
-    // 2. Table Data Preparation
+    // 3. Table Data
     const tableData = records.map(r => [
         r.name,
         r.timeInChecked ? 'PRESENT' : 'ABSENT',
@@ -148,43 +148,39 @@ window.exportPDF = function() {
         r.timeOut || '--'
     ]);
 
-    // 3. Overall Style and Design
+    // 4. Generate Table
     doc.autoTable({
-        startY: 45,
+        startY: 40, // Adjusted to sit just below the logo/header
         head: [['Student Name', 'Status', 'Time In', 'Time Out']],
         body: tableData,
-        theme: 'grid', // Options: 'striped', 'grid', 'plain'
+        theme: 'grid',
         headStyles: { 
-            fillColor: [30, 32, 34], // Dark background (#1e2022)
-            textColor: [244, 190, 85], // Gold text
+            fillColor: [30, 32, 34], 
+            textColor: [244, 190, 85], 
             fontSize: 10,
             halign: 'center' 
         },
         columnStyles: {
-            0: { cellWidth: 80 }, // Student Name column width
+            0: { cellWidth: 80 }, 
             1: { halign: 'center' },
             2: { halign: 'center' },
             3: { halign: 'center' }
         },
-        styles: {
-            font: "helvetica",
-            fontSize: 9,
-            cellPadding: 3
-        },
-        // Change color based on Status (Row Hook)
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 3 },
         didParseCell: function(data) {
             if (data.section === 'body' && data.column.index === 1) {
                 if (data.cell.raw === 'PRESENT') {
-                    data.cell.styles.textColor = [46, 125, 50]; // Green
+                    data.cell.styles.textColor = [46, 125, 50]; 
                 } else {
-                    data.cell.styles.textColor = [183, 28, 28]; // Red
+                    data.cell.styles.textColor = [183, 28, 28]; 
                 }
             }
         }
     });
 
-    doc.save(`Attendance_${eventName}_${DATE_ID}.pdf`);
+    doc.save(`BSIT1C_${eventName}_${DATE_ID}.pdf`);
 };
+
 
 // 6. RENDER LOGIC
 function renderTable() {
