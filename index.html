@@ -107,27 +107,27 @@
   </div>
 
   <!-- Event + Clock -->
-  <section class="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
-    <div class="flex-1">
-      <label class="font-label text-[0.6875rem] uppercase tracking-[0.2em] text-outline mb-2 block">Event</label>
-      <input id="event-name" class="w-full bg-transparent border-none border-b-2 border-surface-container-highest text-2xl md:text-3xl font-headline font-medium text-on-surface py-2 px-0 retro-input-focus transition-all duration-300"
-        placeholder="Enter event name..." type="text" value="Flag Ceremony Attendance"/>
-    </div>
-    <div class="bg-surface-container-lowest px-6 py-4 rounded-lg flex items-center space-x-6 border border-outline-variant/5 shadow-xl">
-      <div class="text-right">
-        <div class="text-xs font-label uppercase tracking-widest text-outline">Time</div>
-        <div class="font-headline text-xl text-primary flex items-center">
-  <span id="clock-time" class="mr-2 min-w-[110px] inline-block">--:--:--</span>
-  <span id="clock-ampm" class="text-[0.6rem] opacity-70">--</span>
-        </div>
-      </div>
-      <div class="h-8 w-[1px] bg-outline-variant/20"></div>
-      <div>
-        <div class="text-xs font-label uppercase tracking-widest text-outline">Date</div>
-        <div class="font-headline text-lg text-on-surface" id="clock-date">--</div>
+ <section class="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
+  <div class="flex-1">
+    <label class="font-label text-[0.6875rem] uppercase tracking-[0.2em] text-outline mb-2 block">Event</label>
+    <input id="event-name" class="w-full bg-transparent border-none border-b-2 border-surface-container-highest text-2xl md:text-3xl font-headline font-medium text-on-surface py-2 px-0 retro-input-focus transition-all duration-300"
+      placeholder="Enter event name..." type="text" value="Flag Ceremony Attendance"/>
+  </div>
+  <div class="bg-surface-container-lowest px-6 py-4 rounded-lg flex items-center space-x-6 border border-outline-variant/5 shadow-xl">
+    <div class="text-right">
+      <div class="text-xs font-label uppercase tracking-widest text-outline">Time</div>
+      <div class="font-headline text-xl text-primary flex items-center justify-end">
+        <span id="clock-time" class="inline-block min-w-[120px] tabular-nums">--:--:--</span>
+        <span id="clock-ampm" class="text-[0.6rem] opacity-70 ml-1">--</span>
       </div>
     </div>
-  </section>
+    <div class="h-8 w-[1px] bg-outline-variant/20"></div>
+    <div>
+      <div class="text-xs font-label uppercase tracking-widest text-outline">Date</div>
+      <div class="font-headline text-lg text-on-surface" id="clock-date">--</div>
+    </div>
+  </div>
+</section>
 
   <!-- Attendance Card -->
   <section class="bg-surface-container rounded-xl overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.6)] relative">
