@@ -116,6 +116,68 @@ window.exportCSV = function() {
   link.click();
 }
 
+window.exportPDF = function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const eventName = document.getElementById('event-name').value || 'Attendance';
+
+    // 1. PDF Header Styling
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(244, 190, 85); // Matches your #f4be55 Gold
+    doc.text("BSIT 1C | ATTENDANCE REPORT", 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100); // Grey text
+    doc.text(`Event: ${eventName}`, 14, 30);
+    doc.text(`Date: ${DATE_ID}`, 14, 35);
+
+    // 2. Table Data Preparation
+    const tableData = records.map(r => [
+        r.name,
+        r.timeInChecked ? 'PRESENT' : 'ABSENT',
+        r.timeIn || '--',
+        r.timeOut || '--'
+    ]);
+
+    // 3. Overall Style and Design
+    doc.autoTable({
+        startY: 45,
+        head: [['Student Name', 'Status', 'Time In', 'Time Out']],
+        body: tableData,
+        theme: 'grid', // Options: 'striped', 'grid', 'plain'
+        headStyles: { 
+            fillColor: [30, 32, 34], // Dark background (#1e2022)
+            textColor: [244, 190, 85], // Gold text
+            fontSize: 10,
+            halign: 'center' 
+        },
+        columnStyles: {
+            0: { cellWidth: 80 }, // Student Name column width
+            1: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'center' }
+        },
+        styles: {
+            font: "helvetica",
+            fontSize: 9,
+            cellPadding: 3
+        },
+        // Change color based on Status (Row Hook)
+        didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 1) {
+                if (data.cell.raw === 'PRESENT') {
+                    data.cell.styles.textColor = [46, 125, 50]; // Green
+                } else {
+                    data.cell.styles.textColor = [183, 28, 28]; // Red
+                }
+            }
+        }
+    });
+
+    doc.save(`Attendance_${eventName}_${DATE_ID}.pdf`);
+};
+
 // 6. RENDER LOGIC
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
