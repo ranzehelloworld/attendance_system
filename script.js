@@ -2,6 +2,37 @@ const { jsPDF } = window.jspdf;
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
 
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+
+const auth = getAuth(app);
+
+// 1. Check if user is logged in
+onAuthStateChanged(auth, (user) => {
+  const loginScreen = document.getElementById('login-screen');
+  const mainContent = document.getElementById('main-content');
+  
+  if (user) {
+    loginScreen.classList.add('hidden');
+    mainContent.classList.remove('hidden');
+  } else {
+    loginScreen.classList.remove('hidden');
+    mainContent.classList.add('hidden');
+  }
+});
+
+// 2. Login function
+window.handleLogin = function() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  const errorEl = document.getElementById('login-error');
+
+  signInWithEmailAndPassword(auth, email, pass)
+    .catch(error => {
+      errorEl.innerText = "Invalid Credentials";
+      errorEl.classList.remove('hidden');
+    });
+};
+
 // 1. FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
