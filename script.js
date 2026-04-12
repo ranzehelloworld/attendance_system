@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 
-// 1. FIREBASE CONFIG (Move this up!)
+// 1. FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
   authDomain: "bsit-1c-attendance.firebaseapp.com",
@@ -38,12 +38,14 @@ window.handleLogin = function() {
   const pass = document.getElementById('login-pass').value;
   const errorEl = document.getElementById('login-error');
 
+  // Adjust domain to match what you put in Firebase Console
   const email = username.includes('@') ? username : `${username}@iictisur.com`;
 
   signInWithEmailAndPassword(auth, email, pass)
     .catch(error => {
       errorEl.innerText = "Invalid Credentials";
       errorEl.classList.remove('hidden');
+      console.error(error.message);
     });
 };
 
@@ -58,7 +60,6 @@ const DATE_ID = new Date().toISOString().slice(0, 10);
 const attendanceRef = ref(db, 'attendance/' + DATE_ID);
 let records = [];
 
-// 2. MASTERLIST
 const DEFAULT_STUDENTS = [
   { id: '1', name: 'Jemica Arceo' }, { id: '2', name: 'Bryan Apostol' },
   { id: '3', name: 'Jush Ancheta' }, { id: '4', name: 'Kezia Balubar' },
@@ -83,23 +84,19 @@ const DEFAULT_STUDENTS = [
   { id: '41', name: 'Reymond Estardo' }
 ];
 
-// 3. HELPERS
 function initials(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-// Function for static timestamp when checkbox is clicked
 function getStaticTime() {
   const d = new Date();
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// 4. CORE DATA LOGIC
 function saveData(data) {
   set(attendanceRef, data);
 }
 
-// 5. HANDLERS
 window.handleTimeCheck = function(id, field, checked) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
@@ -170,7 +167,6 @@ window.exportPDF = function() {
     };
 };
 
-// 6. RENDER & UI LOGIC
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
   if (!tbody) return;
@@ -217,11 +213,18 @@ function renderTable() {
 function updateStats() {
   const present = records.filter(r => r.timeInChecked).length;
   const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
-  document.getElementById('total-count').textContent = records.length;
-  document.getElementById('stat-present').textContent = String(present).padStart(2, '0');
-  document.getElementById('stat-absent').textContent = String(records.length - present).padStart(2, '0');
-  document.getElementById('stat-rate').textContent = `${rate}%`;
-  document.getElementById('rate-bar').style.width = `${rate}%`;
+  
+  const totalCountEl = document.getElementById('total-count');
+  const statPresentEl = document.getElementById('stat-present');
+  const statAbsentEl = document.getElementById('stat-absent');
+  const statRateEl = document.getElementById('stat-rate');
+  const rateBarEl = document.getElementById('rate-bar-fill');
+
+  if(totalCountEl) totalCountEl.textContent = records.length;
+  if(statPresentEl) statPresentEl.textContent = String(present).padStart(2, '0');
+  if(statAbsentEl) statAbsentEl.textContent = String(records.length - present).padStart(2, '0');
+  if(statRateEl) statRateEl.textContent = `${rate}%`;
+  if(rateBarEl) rateBarEl.style.width = `${rate}%`;
 }
 
 function showToast(msg) {
@@ -232,11 +235,8 @@ function showToast(msg) {
   }
 }
 
-// LIVE CLOCK
 function updateClock() {
     const now = new Date();
-    
-    // Format for the main clock display (12-hour with seconds)
     const timeParts = now.toLocaleTimeString([], { 
         hour: '2-digit', 
         minute: '2-digit', 
@@ -244,18 +244,17 @@ function updateClock() {
         hour12: true 
     }).split(' ');
 
-    const timeString = timeParts[0]; // The HH:MM:SS part
-    const ampm = timeParts[1];       // The AM/PM part
+    const clockTime = document.getElementById('clock-time');
+    const clockAmPm = document.getElementById('clock-ampm');
+    const clockDate = document.getElementById('clock-date');
 
-    document.getElementById('clock-time').innerText = timeString;
-    document.getElementById('clock-ampm').innerText = ampm;
+    if(clockTime) clockTime.innerText = timeParts[0];
+    if(clockAmPm) clockAmPm.innerText = timeParts[1];
 
-    // Format for the Date display
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', options);
+    if(clockDate) clockDate.innerText = now.toLocaleDateString('en-US', options);
 }
 
-// 7. INITIALIZATION
 onValue(attendanceRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -267,11 +266,9 @@ onValue(attendanceRef, (snapshot) => {
     renderTable();
 });
 
-// Run clock immediately and set the live interval
 updateClock();
 setInterval(updateClock, 1000);
 
-// Persistence for Event Name
 const eventEl = document.getElementById('event-name');
 if (eventEl) {
     eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
