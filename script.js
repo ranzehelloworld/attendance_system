@@ -42,11 +42,14 @@ window.handleLogin = function() {
   const email = username.includes('@') ? username : `${username}@iictisur.com`;
 
   signInWithEmailAndPassword(auth, email, pass)
-    .catch(error => {
-      errorEl.innerText = "Invalid Credentials";
-      errorEl.classList.remove('hidden');
-      console.error(error.message);
-    });
+  .catch(error => {
+    // This will print the actual secret error code to your browser console
+    console.log("Error Code:", error.code); 
+    console.log("Error Message:", error.message);
+    
+    errorEl.innerText = `Error: ${error.code}`; // Show the real code on screen
+    errorEl.classList.remove('hidden');
+  });
 };
 
 window.handleLogout = function() {
