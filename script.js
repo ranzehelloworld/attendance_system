@@ -5,7 +5,7 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from
 
 // 1. FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "AIzaSyCHJrXSdgtEiGFC-hJqOeymatmGF2Unt8w",
+  apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
   authDomain: "bsit-1c-attendance.firebaseapp.com",
   databaseURL: "https://bsit-1c-attendance-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "bsit-1c-attendance",
