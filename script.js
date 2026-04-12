@@ -1,12 +1,25 @@
 const { jsPDF } = window.jspdf;
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+// 1. FIREBASE CONFIG (Move this up!)
+const firebaseConfig = {
+  apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
+  authDomain: "bsit-1c-attendance.firebaseapp.com",
+  databaseURL: "https://bsit-1c-attendance-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bsit-1c-attendance",
+  storageBucket: "bsit-1c-attendance.firebasestorage.app",
+  messagingSenderId: "935043253740",
+  appId: "1:935043253740:web:c48c12af9d07b22eee2cc9"
+};
 
+// 2. INITIALIZE
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 const auth = getAuth(app);
 
-// 1. Check if user is logged in
+// 3. AUTH LOGIC
 onAuthStateChanged(auth, (user) => {
   const loginScreen = document.getElementById('login-screen');
   const mainContent = document.getElementById('main-content');
@@ -20,11 +33,12 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// 2. Login function
 window.handleLogin = function() {
-  const email = document.getElementById('login-email').value;
+  const username = document.getElementById('login-username').value;
   const pass = document.getElementById('login-pass').value;
   const errorEl = document.getElementById('login-error');
+
+  const email = username.includes('@') ? username : `${username}@iictisur.com`;
 
   signInWithEmailAndPassword(auth, email, pass)
     .catch(error => {
@@ -33,22 +47,15 @@ window.handleLogin = function() {
     });
 };
 
-// 1. FIREBASE CONFIG
-const firebaseConfig = {
-  apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
-  authDomain: "bsit-1c-attendance.firebaseapp.com",
-  databaseURL: "https://bsit-1c-attendance-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "bsit-1c-attendance",
-  storageBucket: "bsit-1c-attendance.firebasestorage.app",
-  messagingSenderId: "935043253740",
-  appId: "1:935043253740:web:c48c12af9d07b22eee2cc9"
+window.handleLogout = function() {
+    signOut(auth).then(() => {
+        showToast("Session Ended");
+    });
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// 4. DATABASE REFS
 const DATE_ID = new Date().toISOString().slice(0, 10);
 const attendanceRef = ref(db, 'attendance/' + DATE_ID);
-
 let records = [];
 
 // 2. MASTERLIST
