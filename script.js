@@ -84,7 +84,7 @@ const DEFAULT_STUDENTS = [
   { id: '35', name: 'Maria Hezekiah Mae Still' }, { id: '36', name: 'Paul Junarc Tayag' },
   { id: '37', name: 'May Ann Tadeo' }, { id: '38', name: 'Mark Angelo Tolentino' },
   { id: '39', name: 'Aisha Viñas' }, { id: '40', name: 'Rhian Villanueva' },
-  { id: '41', name: 'Reymond Estardo' }
+  { id: '41', name: 'Reymond Estardo' }, { id: '42', name: 'Jeston Valdez' }
 ];
 
 function initials(name) {
