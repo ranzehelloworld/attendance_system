@@ -259,12 +259,37 @@ function updateClock() {
 }
 
 onValue(attendanceRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        records = data; 
+    const dbData = snapshot.val();
+    
+    // 1. Create the 'ideal' list from your code (the DEFAULT_STUDENTS)
+    const idealRecords = [...DEFAULT_STUDENTS]
+      .sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
+      .map(s => ({ 
+          ...s, 
+          timeInChecked: false, 
+          timeIn: '', 
+          timeOutChecked: false, 
+          timeOut: '' 
+      }));
+
+    if (!dbData) {
+        // If the database is totally empty for today, use the defaults
+        records = idealRecords;
+        saveData(records); // Push to database
     } else {
-        records = [...DEFAULT_STUDENTS].sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
-          .map(s => ({ ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
+        // If data exists, we need to MERGE them so we don't lose checkmarks
+        records = idealRecords.map(idealStudent => {
+            // Check if this student already has a record in the database
+            const existingRecord = dbData.find(r => r.id === idealStudent.id);
+            
+            // If they exist in DB, keep their checkmarks. If not, use the blank one.
+            return existingRecord ? existingRecord : idealStudent;
+        });
+
+        // If you added a new student, the database needs to know about them
+        if (dbData.length !== records.length) {
+            saveData(records);
+        }
     }
     renderTable();
 });
