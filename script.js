@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// 2. AUTH LOGIC
+// 2. AUTH
 onAuthStateChanged(auth, (user) => {
   const loginScreen = document.getElementById('login-screen');
   const mainContent = document.getElementById('main-content');
@@ -46,7 +46,7 @@ window.handleLogout = function() {
     signOut(auth).then(() => showToast("Session Ended"));
 };
 
-// 3. DATABASE REFS & STATE
+// 3. DATABASE STATE
 const DATE_ID = new Date().toISOString().slice(0, 10);
 const attendanceRef = ref(db, 'attendance/' + DATE_ID);
 let records = [];
@@ -75,48 +75,55 @@ const DEFAULT_STUDENTS = [
   { id: '41', name: 'Reymond Estardo' }, { id: '42', name: 'Jeston Valdez' }
 ];
 
-// 4. UTILITIES
+// 4. UTILS
 function getStaticTime() {
-  return new Date().toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit', 
-    hour12: true 
-  });
+  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-function saveData(data) {
-  set(attendanceRef, data);
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if(t) {
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
 }
 
-// Reset function called after exports
-function resetAttendanceAfterExport() {
-    records = records.map(r => ({
-        ...r,
-        timeInChecked: false,
-        timeIn: '',
-        timeOutChecked: false,
-        timeOut: ''
-    }));
-    saveData(records);
-    showToast("File Saved & Attendance Reset");
+function updateStats() {
+  const present = records.filter(r => r.timeInChecked).length;
+  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
+  
+  const els = {
+    total: document.getElementById('total-count'),
+    pres: document.getElementById('stat-present'),
+    abs: document.getElementById('stat-absent'),
+    rate: document.getElementById('stat-rate'),
+    bar: document.getElementById('rate-bar-fill')
+  };
+
+  if(els.total) els.total.textContent = records.length;
+  if(els.pres) els.pres.textContent = String(present).padStart(2, '0');
+  if(els.abs) els.abs.textContent = String(records.length - present).padStart(2, '0');
+  if(els.rate) els.rate.textContent = `${rate}%`;
+  if(els.bar) els.bar.style.width = `${rate}%`;
 }
 
-// 5. EVENT HANDLERS
+// 5. HANDLERS
 window.handleTimeCheck = function(id, field, checked) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
   rec[checkedField] = checked;
   rec[field] = checked ? getStaticTime() : '';
-  saveData(records);
-  updateStats();
+  set(attendanceRef, records); // Save to Firebase
+  showToast(checked ? "Attendance Recorded" : "Attendance Removed");
 };
 
 window.handleManualTimeChange = function(id, field, value) {
     const rec = records.find(r => r.id === id);
     if (!rec) return;
     rec[field] = value;
-    saveData(records);
+    set(attendanceRef, records);
+    showToast("Time Manually Updated");
 };
 
 window.exportCSV = function() {
@@ -127,9 +134,9 @@ window.exportCSV = function() {
   });
   const link = document.createElement("a");
   link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-  link.download = `BSIT 1C ${event} ${DATE_ID}.csv`;
+  link.download = `BSIT_1C_${event}_${DATE_ID}.csv`;
   link.click();
-  resetAttendanceAfterExport();
+  resetData();
 };
 
 window.exportPDF = function() {
@@ -145,36 +152,28 @@ window.exportPDF = function() {
         doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20);
         doc.setFontSize(10);
         doc.setTextColor(100); 
-        doc.text(`Event: ${eventName}`, 38, 27);
-        doc.text(`Date: ${DATE_ID}`, 38, 32);
+        doc.text(`Event: ${eventName} | Date: ${DATE_ID}`, 38, 27);
 
-        const tableData = records.map(r => [
-            r.name,
-            r.timeInChecked ? 'PRESENT' : 'ABSENT',
-            r.timeIn || '--',
-            r.timeOut || '--'
-        ]);
-
+        const tableData = records.map(r => [r.name, r.timeInChecked ? 'PRESENT' : 'ABSENT', r.timeIn || '--', r.timeOut || '--']);
         doc.autoTable({
             startY: 40,
             head: [['Name', 'Status', 'Time In', 'Time Out']],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [156, 77, 185], halign: 'center' }
+            headStyles: { fillColor: [156, 77, 185] }
         });
-        doc.save(`BSIT 1C ${eventName} ${DATE_ID}.pdf`);
-        resetAttendanceAfterExport();
+        doc.save(`BSIT_1C_${eventName}_${DATE_ID}.pdf`);
+        resetData();
     };
 };
 
-window.filterStudents = function() {
-  const query = document.getElementById('student-search').value.toLowerCase();
-  document.querySelectorAll('#student-table-body tr').forEach(row => {
-    row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
-  });
-};
+function resetData() {
+    records = records.map(r => ({ ...r, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
+    set(attendanceRef, records);
+    showToast("File Saved & Attendance Reset");
+}
 
-// 6. CORE RENDERING
+// 6. RENDER
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
   if (!tbody) return;
@@ -201,7 +200,7 @@ function renderTable() {
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
             <input type="text" value="${rec.timeIn || '--'}" 
-                   class="bg-transparent border-none text-[0.7rem] text-secondary font-mono w-16 p-0 text-center focus:ring-0"
+                   class="bg-transparent border-none text-[0.7rem] text-secondary font-mono w-20 p-0 text-center focus:ring-0"
                    onchange="window.handleManualTimeChange('${rec.id}', 'timeIn', this.value)">
           </div>
           <div class="flex flex-col items-center gap-1">
@@ -211,7 +210,7 @@ function renderTable() {
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tertiary"></div>
             </label>
             <input type="text" value="${rec.timeOut || '--'}" 
-                   class="bg-transparent border-none text-[0.7rem] text-on-surface-variant font-mono w-16 p-0 text-center focus:ring-0"
+                   class="bg-transparent border-none text-[0.7rem] text-on-surface-variant font-mono w-20 p-0 text-center focus:ring-0"
                    onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
           </div>
         </div>
@@ -221,60 +220,32 @@ function renderTable() {
   updateStats();
 }
 
-function updateStats() {
-  const present = records.filter(r => r.timeInChecked).length;
-  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
-  document.getElementById('total-count').textContent = records.length;
-  document.getElementById('stat-present').textContent = String(present).padStart(2, '0');
-  document.getElementById('stat-absent').textContent = String(records.length - present).padStart(2, '0');
-  document.getElementById('stat-rate').textContent = `${rate}%`;
-  document.getElementById('rate-bar-fill').style.width = `${rate}%`;
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  if(t) {
-    t.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
-  }
-}
-
-function updateClock() {
-    const now = new Date();
-    const timeParts = now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
-    }).split(' ');
-    document.getElementById('clock-time').innerText = timeParts[0];
-    document.getElementById('clock-ampm').innerText = timeParts[1];
-    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// 7. INITIALIZATION & SYNC
+// 7. INITIALIZE
 onValue(attendanceRef, (snapshot) => {
     const dbData = snapshot.val();
-    const idealRecords = [...DEFAULT_STUDENTS]
+    const ideal = [...DEFAULT_STUDENTS]
       .sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
       .map(s => ({ ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
 
     if (!dbData) {
-        records = idealRecords;
-        saveData(records);
+        records = ideal;
+        set(attendanceRef, records);
     } else {
-        records = idealRecords.map(idealStudent => {
-            const existingRecord = dbData.find(r => r.id === idealStudent.id);
-            return existingRecord ? existingRecord : idealStudent;
+        records = ideal.map(s => {
+            const match = dbData.find(r => r.id === s.id);
+            return match ? match : s;
         });
-        if (dbData.length !== records.length) saveData(records);
+        if (dbData.length !== records.length) set(attendanceRef, records);
     }
     renderTable();
 });
 
-updateClock();
-setInterval(updateClock, 1000);
-
-const eventEl = document.getElementById('event-name');
-if (eventEl) {
-    eventEl.addEventListener('input', () => localStorage.setItem('attendance_event_name', eventEl.value));
-    const saved = localStorage.getItem('attendance_event_name');
-    if (saved) eventEl.value = saved;
+function updateClock() {
+    const now = new Date();
+    const timeParts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split(' ');
+    document.getElementById('clock-time').innerText = timeParts[0];
+    document.getElementById('clock-ampm').innerText = timeParts[1];
+    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+setInterval(updateClock, 1000);
+updateClock();
