@@ -145,25 +145,54 @@ window.exportPDF = function() {
     img.src = 'iict-logo.png';
     img.onload = function() {
         const doc = new jsPDF();
-        doc.addImage(img, 'PNG', 14, 10, 20, 20);
+        
+        // 1. HEADER (Matches your uploaded PDF layout)
+        doc.addImage(img, 'PNG', 14, 10, 20, 20); // Logo
+        
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
         doc.setTextColor(156, 77, 185); 
-        doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20);
+        doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20); // Main Title
+        
         doc.setFontSize(10);
         doc.setTextColor(100); 
-        doc.text(`Event: ${eventName} | Date: ${DATE_ID}`, 38, 27);
+        doc.text(`Event: ${eventName}`, 38, 27); // Event on its own line
+        doc.text(`Date: ${DATE_ID}`, 38, 32);   // Date on its own line
 
-        const tableData = records.map(r => [r.name, r.timeInChecked ? 'PRESENT' : 'ABSENT', r.timeIn || '--', r.timeOut || '--']);
+        // 2. TABLE DATA
+        const tableData = records.map(r => [
+            r.name,
+            r.timeInChecked ? 'PRESENT' : 'ABSENT',
+            r.timeIn || '--',
+            r.timeOut || '--'
+        ]);
+
+        // 3. TABLE STYLING (Restored Grid and Colors)
         doc.autoTable({
             startY: 40,
             head: [['Name', 'Status', 'Time In', 'Time Out']],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [156, 77, 185] }
+            headStyles: { fillColor: [156, 77, 185], halign: 'center' },
+            columnStyles: {
+                1: { halign: 'center', fontStyle: 'bold' }, // Status column
+                2: { halign: 'center' },
+                3: { halign: 'center' }
+            },
+            didParseCell: function(data) {
+                // Restore green for PRESENT and red for ABSENT
+                if (data.section === 'body' && data.column.index === 1) {
+                    if (data.cell.raw === 'PRESENT') {
+                        data.cell.styles.textColor = [76, 175, 80]; // Green
+                    } else {
+                        data.cell.styles.textColor = [183, 28, 28]; // Red
+                    }
+                }
+            }
         });
-        doc.save(`BSIT_1C_${eventName}_${DATE_ID}.pdf`);
-        resetData();
+
+        doc.save(`BSIT 1C ${eventName} Attendance ${DATE_ID}.pdf`);
+        resetData(); // Reset after successful export
     };
 };
 
