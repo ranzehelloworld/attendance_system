@@ -14,16 +14,14 @@ const firebaseConfig = {
   appId: "1:935043253740:web:c48c12af9d07b22eee2cc9"
 };
 
-// 2. INITIALIZE
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// 3. AUTH LOGIC
+// 2. AUTH LOGIC
 onAuthStateChanged(auth, (user) => {
   const loginScreen = document.getElementById('login-screen');
   const mainContent = document.getElementById('main-content');
-  
   if (user) {
     loginScreen.classList.add('hidden');
     mainContent.classList.remove('hidden');
@@ -36,29 +34,19 @@ onAuthStateChanged(auth, (user) => {
 window.handleLogin = function() {
   const username = document.getElementById('login-username').value;
   const pass = document.getElementById('login-pass').value;
-  const errorEl = document.getElementById('login-error');
-
-  // Adjust domain to match what you put in Firebase Console
   const email = username.includes('@') ? username : `${username}@iictisur.com`;
-
-  signInWithEmailAndPassword(auth, email, pass)
-  .catch(error => {
-    // This will print the actual secret error code to your browser console
-    console.log("Error Code:", error.code); 
-    console.log("Error Message:", error.message);
-    
-    errorEl.innerText = `Error: ${error.code}`; // Show the real code on screen
+  signInWithEmailAndPassword(auth, email, pass).catch(error => {
+    const errorEl = document.getElementById('login-error');
+    errorEl.innerText = `Error: ${error.code}`;
     errorEl.classList.remove('hidden');
   });
 };
 
 window.handleLogout = function() {
-    signOut(auth).then(() => {
-        showToast("Session Ended");
-    });
+    signOut(auth).then(() => showToast("Session Ended"));
 };
 
-// 4. DATABASE REFS
+// 3. DATABASE REFS & STATE
 const DATE_ID = new Date().toISOString().slice(0, 10);
 const attendanceRef = ref(db, 'attendance/' + DATE_ID);
 let records = [];
@@ -87,19 +75,33 @@ const DEFAULT_STUDENTS = [
   { id: '41', name: 'Reymond Estardo' }, { id: '42', name: 'Jeston Valdez' }
 ];
 
-function initials(name) {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-}
-
+// 4. UTILITIES
 function getStaticTime() {
-  const d = new Date();
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date().toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  });
 }
 
 function saveData(data) {
   set(attendanceRef, data);
 }
 
+// Reset function called after exports
+function resetAttendanceAfterExport() {
+    records = records.map(r => ({
+        ...r,
+        timeInChecked: false,
+        timeIn: '',
+        timeOutChecked: false,
+        timeOut: ''
+    }));
+    saveData(records);
+    showToast("File Saved & Attendance Reset");
+}
+
+// 5. EVENT HANDLERS
 window.handleTimeCheck = function(id, field, checked) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
@@ -108,28 +110,27 @@ window.handleTimeCheck = function(id, field, checked) {
   rec[field] = checked ? getStaticTime() : '';
   saveData(records);
   updateStats();
-  showToast(checked ? `Attendance Recorded` : `Attendance Removed`);
-}
+};
 
-window.filterStudents = function() {
-  const query = document.getElementById('student-search').value.toLowerCase();
-  const rows = document.querySelectorAll('#student-table-body tr');
-  rows.forEach(row => {
-    row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
-  });
-}
+window.handleManualTimeChange = function(id, field, value) {
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    rec[field] = value;
+    saveData(records);
+};
 
 window.exportCSV = function() {
   const event = document.getElementById('event-name').value || 'Attendance';
-  let csv = "Name,Status,In,Out\n";
+  let csv = "Name,Status,Time In,Time Out\n";
   records.forEach(r => {
     csv += `"${r.name}",${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
   });
   const link = document.createElement("a");
   link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-  link.download = `BSIT 1C ${event} Attendance ${DATE_ID}.csv`;
+  link.download = `BSIT 1C ${event} ${DATE_ID}.csv`;
   link.click();
-}
+  resetAttendanceAfterExport();
+};
 
 window.exportPDF = function() {
     const eventName = document.getElementById('event-name').value || 'Attendance';
@@ -159,31 +160,34 @@ window.exportPDF = function() {
             head: [['Name', 'Status', 'Time In', 'Time Out']],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [156, 77, 185], halign: 'center' },
-            didParseCell: function(data) {
-                if (data.section === 'body' && data.column.index === 1) {
-                    data.cell.styles.textColor = data.cell.raw === 'PRESENT' ? [76, 175, 80] : [183, 28, 28];
-                }
-            }
+            headStyles: { fillColor: [156, 77, 185], halign: 'center' }
         });
-        doc.save(`BSIT 1C ${eventName} Attendance ${DATE_ID}.pdf`);
+        doc.save(`BSIT 1C ${eventName} ${DATE_ID}.pdf`);
+        resetAttendanceAfterExport();
     };
 };
 
+window.filterStudents = function() {
+  const query = document.getElementById('student-search').value.toLowerCase();
+  document.querySelectorAll('#student-table-body tr').forEach(row => {
+    row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+  });
+};
+
+// 6. CORE RENDERING
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
   if (!tbody) return;
   tbody.innerHTML = '';
 
   records.forEach((rec) => {
-    const init = initials(rec.name);
     const tr = document.createElement('tr');
     tr.className = "hover:bg-surface-container-high transition-colors group";
     tr.innerHTML = `
       <td class="px-8 py-5">
         <div class="flex items-center">
-          <div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center mr-4 border border-outline-variant/20">
-            <span class="text-xs font-headline font-bold text-primary">${init}</span>
+          <div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center mr-4 border border-outline-variant/20 text-primary">
+            <span class="material-symbols-outlined">account_circle</span>
           </div>
           <div class="font-headline text-on-surface group-hover:text-primary transition-colors">${rec.name}</div>
         </div>
@@ -196,7 +200,9 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeInChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeIn', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
-            <span class="text-[0.7rem] text-secondary font-mono">${rec.timeIn || '--:--'}</span>
+            <input type="text" value="${rec.timeIn || '--'}" 
+                   class="bg-transparent border-none text-[0.7rem] text-secondary font-mono w-16 p-0 text-center focus:ring-0"
+                   onchange="window.handleManualTimeChange('${rec.id}', 'timeIn', this.value)">
           </div>
           <div class="flex flex-col items-center gap-1">
             <span class="text-[0.5rem] text-outline uppercase">Out</span>
@@ -204,7 +210,9 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeOutChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeOut', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tertiary"></div>
             </label>
-            <span class="text-[0.7rem] text-on-surface-variant font-mono">${rec.timeOut || '--:--'}</span>
+            <input type="text" value="${rec.timeOut || '--'}" 
+                   class="bg-transparent border-none text-[0.7rem] text-on-surface-variant font-mono w-16 p-0 text-center focus:ring-0"
+                   onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
           </div>
         </div>
       </td>`;
@@ -216,18 +224,11 @@ function renderTable() {
 function updateStats() {
   const present = records.filter(r => r.timeInChecked).length;
   const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
-  
-  const totalCountEl = document.getElementById('total-count');
-  const statPresentEl = document.getElementById('stat-present');
-  const statAbsentEl = document.getElementById('stat-absent');
-  const statRateEl = document.getElementById('stat-rate');
-  const rateBarEl = document.getElementById('rate-bar-fill');
-
-  if(totalCountEl) totalCountEl.textContent = records.length;
-  if(statPresentEl) statPresentEl.textContent = String(present).padStart(2, '0');
-  if(statAbsentEl) statAbsentEl.textContent = String(records.length - present).padStart(2, '0');
-  if(statRateEl) statRateEl.textContent = `${rate}%`;
-  if(rateBarEl) rateBarEl.style.width = `${rate}%`;
+  document.getElementById('total-count').textContent = records.length;
+  document.getElementById('stat-present').textContent = String(present).padStart(2, '0');
+  document.getElementById('stat-absent').textContent = String(records.length - present).padStart(2, '0');
+  document.getElementById('stat-rate').textContent = `${rate}%`;
+  document.getElementById('rate-bar-fill').style.width = `${rate}%`;
 }
 
 function showToast(msg) {
@@ -240,56 +241,30 @@ function showToast(msg) {
 
 function updateClock() {
     const now = new Date();
-    const timeParts = now.toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit',
-        hour12: true 
+    const timeParts = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
     }).split(' ');
-
-    const clockTime = document.getElementById('clock-time');
-    const clockAmPm = document.getElementById('clock-ampm');
-    const clockDate = document.getElementById('clock-date');
-
-    if(clockTime) clockTime.innerText = timeParts[0];
-    if(clockAmPm) clockAmPm.innerText = timeParts[1];
-
-    const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    if(clockDate) clockDate.innerText = now.toLocaleDateString('en-US', options);
+    document.getElementById('clock-time').innerText = timeParts[0];
+    document.getElementById('clock-ampm').innerText = timeParts[1];
+    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// 7. INITIALIZATION & SYNC
 onValue(attendanceRef, (snapshot) => {
     const dbData = snapshot.val();
-    
-    // 1. Create the 'ideal' list from your code (the DEFAULT_STUDENTS)
     const idealRecords = [...DEFAULT_STUDENTS]
       .sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
-      .map(s => ({ 
-          ...s, 
-          timeInChecked: false, 
-          timeIn: '', 
-          timeOutChecked: false, 
-          timeOut: '' 
-      }));
+      .map(s => ({ ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
 
     if (!dbData) {
-        // If the database is totally empty for today, use the defaults
         records = idealRecords;
-        saveData(records); // Push to database
+        saveData(records);
     } else {
-        // If data exists, we need to MERGE them so we don't lose checkmarks
         records = idealRecords.map(idealStudent => {
-            // Check if this student already has a record in the database
             const existingRecord = dbData.find(r => r.id === idealStudent.id);
-            
-            // If they exist in DB, keep their checkmarks. If not, use the blank one.
             return existingRecord ? existingRecord : idealStudent;
         });
-
-        // If you added a new student, the database needs to know about them
-        if (dbData.length !== records.length) {
-            saveData(records);
-        }
+        if (dbData.length !== records.length) saveData(records);
     }
     renderTable();
 });
