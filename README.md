@@ -1,6 +1,6 @@
 # 🚀 BSIT 1C | Real-Time Attendance Portal
 
-A modern, cloud-synced attendance tracking system designed for the BSIT 1C section at Isabela State University. This portal allows for real-time tracking of student "Time In" and "Time Out" status with instant synchronization across all devices.
+A modern, cloud-synced attendance tracking system. This portal allows for real-time tracking of student "Time In" and "Time Out" status with instant synchronization across all devices.
 
 ## ✨ Features
 
