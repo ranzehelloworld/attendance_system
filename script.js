@@ -127,16 +127,19 @@ window.handleManualTimeChange = function(id, field, value) {
 };
 
 window.exportCSV = function() {
-  const event = document.getElementById('event-name').value || 'Attendance';
-  let csv = "Name,Status,Time In,Time Out\n";
-  records.forEach(r => {
-    csv += `"${r.name}",${r.timeInChecked?'PRESENT':'ABSENT'},${r.timeIn||'--'},${r.timeOut||'--'}\n`;
-  });
-  const link = document.createElement("a");
-  link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-  link.download = `BSIT_1C_${event}_${DATE_ID}.csv`;
-  link.click();
-  resetData();
+    const event = document.getElementById('event-name').value || 'Attendance';
+    let csv = "Name,Status,Time In,Time Out\n";
+    records.forEach(r => {
+        csv += `"${r.name}",${r.timeInChecked ? 'PRESENT' : 'ABSENT'},${r.timeIn || '--'},${r.timeOut || '--'}\n`;
+    });
+    
+    const link = document.createElement("a");
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+    link.download = `BSIT_1C_${event}_${DATE_ID}.csv`;
+    link.click();
+
+    // Trigger the reset after the download link is clicked
+    resetData();
 };
 
 window.exportPDF = function() {
@@ -146,62 +149,66 @@ window.exportPDF = function() {
     img.onload = function() {
         const doc = new jsPDF();
         
-        // 1. HEADER (Matches your uploaded PDF layout)
-        doc.addImage(img, 'PNG', 14, 10, 20, 20); // Logo
-        
+        // Header Info
+        doc.addImage(img, 'PNG', 14, 10, 20, 20);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
         doc.setTextColor(156, 77, 185); 
-        doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20); // Main Title
+        doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20);
         
         doc.setFontSize(10);
         doc.setTextColor(100); 
-        doc.text(`Event: ${eventName}`, 38, 27); // Event on its own line
-        doc.text(`Date: ${DATE_ID}`, 38, 32);   // Date on its own line
+        doc.text(`Event: ${eventName}`, 38, 27);
+        doc.text(`Date: ${DATE_ID}`, 38, 32);
 
-        // 2. TABLE DATA
         const tableData = records.map(r => [
-            r.name,
-            r.timeInChecked ? 'PRESENT' : 'ABSENT',
-            r.timeIn || '--',
+            r.name, 
+            r.timeInChecked ? 'PRESENT' : 'ABSENT', 
+            r.timeIn || '--', 
             r.timeOut || '--'
         ]);
 
-        // 3. TABLE STYLING (Restored Grid and Colors)
         doc.autoTable({
             startY: 40,
             head: [['Name', 'Status', 'Time In', 'Time Out']],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [156, 77, 185], halign: 'center' },
-            columnStyles: {
-                1: { halign: 'center', fontStyle: 'bold' }, // Status column
-                2: { halign: 'center' },
-                3: { halign: 'center' }
-            },
+            headStyles: { fillColor: [156, 77, 185] },
             didParseCell: function(data) {
-                // Restore green for PRESENT and red for ABSENT
                 if (data.section === 'body' && data.column.index === 1) {
-                    if (data.cell.raw === 'PRESENT') {
-                        data.cell.styles.textColor = [76, 175, 80]; // Green
-                    } else {
-                        data.cell.styles.textColor = [183, 28, 28]; // Red
-                    }
+                    data.cell.styles.textColor = (data.cell.raw === 'PRESENT') ? [76, 175, 80] : [183, 28, 28];
                 }
             }
         });
 
+        // Save the file
         doc.save(`BSIT 1C ${eventName} Attendance ${DATE_ID}.pdf`);
-        resetData(); // Reset after successful export
+        
+        // Trigger the reset immediately after saving
+        resetData();
     };
 };
 
+// Add this function to your script. Ensure it is accessible
 function resetData() {
-    records = records.map(r => ({ ...r, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
-    set(attendanceRef, records);
-    showToast("File Saved & Attendance Reset");
-}
+    // 1. Create a clean version of the records array
+    const cleanedRecords = records.map(r => ({
+        ...r,
+        timeInChecked: false,
+        timeIn: '',
+        timeOutChecked: false,
+        timeOut: ''
+    }));
 
+    // 2. Update Firebase (This will trigger the UI to clear automatically)
+    set(attendanceRef, cleanedRecords)
+        .then(() => {
+            showToast("File Saved & Attendance Reset");
+        })
+        .catch((error) => {
+            console.error("Reset failed:", error);
+        });
+}
 // 6. RENDER
 function renderTable() {
   const tbody = document.getElementById('student-table-body');
