@@ -16,9 +16,8 @@ self.addEventListener('install', (event) => {
 
 // Fetch: Serve from cache if offline
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
+    // This allows the app to be installable
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request))
+    );
 });
