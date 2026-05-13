@@ -1,8 +1,8 @@
 {
   "name": "BSIT 1C Attendance Portal",
   "short_name": "Attendance",
-  "start_url": "/attendance_system/",
-  "scope": "/attendance_system/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#1C1B1F",
   "theme_color": "#9C4DB9",
