@@ -1,9 +1,15 @@
 const { jsPDF } = window.jspdf;
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue } from "firebase/database";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { getDatabase, ref, set, onValue, get } from "firebase/database";
+import { 
+    getAuth, 
+    signInWithPopup, 
+    GoogleAuthProvider, 
+    onAuthStateChanged, 
+    signOut 
+} from "firebase/auth";
 
-// 1. FIREBASE CONFIG
+// 1. FIREBASE INITIALIZATION
 const firebaseConfig = {
   apiKey: "AIzaSyAA3Wevu6dpu8fSraSplCM7y6QDYGxrOpU",
   authDomain: "bsit-1c-attendance.firebaseapp.com",
@@ -17,70 +23,192 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
-// 2. AUTH
-onAuthStateChanged(auth, (user) => {
-  const loginScreen = document.getElementById('login-screen');
-  const mainContent = document.getElementById('main-content');
-  if (user) {
-    loginScreen.classList.add('hidden');
-    mainContent.classList.remove('hidden');
-  } else {
-    loginScreen.classList.remove('hidden');
-    mainContent.classList.add('hidden');
-  }
+// 2. STATE ENVIRONMENT CONTROLLERS
+const DATE_ID = new Date().toISOString().slice(0, 10); //
+let currentUser = null;
+let currentClassInfo = null;
+let records = []; //
+let databaseDisconnectListener = null;
+
+// DOM View Targets
+const screens = {
+    login: document.getElementById('login-screen'),
+    onboarding: document.getElementById('onboarding-screen'),
+    main: document.getElementById('main-content'),
+    step1: document.getElementById('onboarding-step-1'),
+    step2: document.getElementById('onboarding-step-2')
+};
+
+// 3. SECURE AUTHENTICATION HUB
+onAuthStateChanged(auth, async (user) => {
+    // Teardown any existing active listeners to avoid multi-user memory bleed
+    if (databaseDisconnectListener) {
+        databaseDisconnectListener();
+        databaseDisconnectListener = null;
+    }
+
+    if (user) {
+        currentUser = user;
+        screens.login.classList.add('hidden');
+        
+        // Query profile metadata to see if onboarding setup is complete
+        const userProfileSnapshot = await get(ref(db, `users/${user.uid}/profile`));
+        const profile = userProfileSnapshot.val();
+
+        if (profile && profile.setupComplete) {
+            // Profile exists! Bootstrap the main portal interface
+            currentClassInfo = profile.classInfo;
+            mountMainDashboard();
+        } else {
+            // New account: Init step 1 profile pre-fill views
+            document.getElementById('user-avatar').src = user.photoURL || '';
+            document.getElementById('profile-name').value = user.displayName || '';
+            
+            screens.onboarding.classList.remove('hidden');
+            screens.step1.classList.remove('hidden');
+            screens.step2.classList.add('hidden');
+            screens.main.classList.add('hidden');
+        }
+    } else {
+        currentUser = null;
+        currentClassInfo = null;
+        records = []; //
+        screens.login.classList.remove('hidden');
+        screens.onboarding.classList.add('hidden');
+        screens.main.classList.add('hidden');
+    }
 });
 
-window.handleLogin = function() {
-  const username = document.getElementById('login-username').value;
-  const pass = document.getElementById('login-pass').value;
-  const email = username.includes('@') ? username : `${username}@iictisur.com`;
-  signInWithEmailAndPassword(auth, email, pass).catch(error => {
-    const errorEl = document.getElementById('login-error');
-    errorEl.innerText = `Error: ${error.code}`;
-    errorEl.classList.remove('hidden');
-  });
+window.handleGoogleLogin = function() {
+    signInWithPopup(auth, provider).catch(error => {
+        const errorEl = document.getElementById('login-error');
+        errorEl.innerText = `Auth Error: ${error.message}`;
+        errorEl.classList.remove('hidden');
+    });
 };
 
 window.handleLogout = function() {
-    signOut(auth).then(() => showToast("Session Ended"));
+    signOut(auth).then(() => showToast("Session Closed")); //
 };
 
-// 3. DATABASE STATE
-const DATE_ID = new Date().toISOString().slice(0, 10);
-const attendanceRef = ref(db, 'attendance/' + DATE_ID);
-let records = [];
+// 4. ONBOARDING & MOBILE CLIPBOARD SANITIZER
+window.skipProfileCustomization = function() {
+    screens.step1.classList.add('hidden');
+    screens.step2.classList.remove('hidden');
+};
 
-const DEFAULT_STUDENTS = [
-  { id: '1', name: 'Jemica Arceo' }, { id: '2', name: 'Bryan Apostol' },
-  { id: '3', name: 'Jush Ancheta' }, { id: '4', name: 'Kezia Balubar' },
-  { id: '5', name: 'Jamil Bayabao' }, { id: '6', name: 'Jeremy Besa' },
-  { id: '7', name: 'Princess Bergonia' }, { id: '8', name: 'Julian Bello' },
-  { id: '9', name: 'Christian Jeff Bricia' }, { id: '10', name: 'Jester Bumanglag' },
-  { id: '11', name: 'King Jb Cabasag' }, { id: '12', name: 'Alyssa Cacal' },
-  { id: '13', name: 'Darlene Cabreros' }, { id: '14', name: 'Roger Carpio' },
-  { id: '15', name: 'Rose Cañeza' }, { id: '16', name: 'Aldrin Dela Cruz' },
-  { id: '17', name: 'Ivy Del Rosario' }, { id: '18', name: 'Cesar Faustino' },
-  { id: '19', name: 'Edelyn Fernandez' }, { id: '20', name: 'Andrew Gaudan' },
-  { id: '21', name: 'Prince Jhon Olvidado' }, { id: '22', name: 'Christopher Madamba' },
-  { id: '23', name: 'Darwin Magbual' }, { id: '24', name: 'Oyo Boy Martinez' },
-  { id: '25', name: 'Amelia Julian' }, { id: '26', name: 'Francis John Pinto' },
-  { id: '27', name: 'Krisjay Portugal' }, { id: '28', name: 'Melmar Ranque' },
-  { id: '29', name: 'Adrian Ramos' }, { id: '30', name: 'Ellaisa Ramos' },
-  { id: '31', name: 'Aaron Reyes' }, { id: '32', name: 'Mark Ruel Santiago' },
-  { id: '33', name: 'Jaypee Santos' }, { id: '34', name: 'Erica Soto' },
-  { id: '35', name: 'Maria Hezekiah Mae Still' }, { id: '36', name: 'Paul Junarc Tayag' },
-  { id: '37', name: 'May Ann Tadeo' }, { id: '38', name: 'Mark Angelo Tolentino' },
-  { id: '39', name: 'Aisha Viñas' }, { id: '40', name: 'Rhian Villanueva' },
-  { id: '41', name: 'Reymond Estardo' }, { id: '42', name: 'Jeston Valdez' }
-];
+window.saveProfileCustomization = async function() {
+    const updatedName = document.getElementById('profile-name').value.trim();
+    if (!updatedName) return showToast("Name field cannot be blank");
+    
+    // Partially write data and proceed to Class Configuration
+    await set(ref(db, `users/${currentUser.uid}/profile/name`), updatedName);
+    screens.step1.classList.add('hidden');
+    screens.step2.classList.remove('hidden');
+};
 
-// 4. UTILS
-function getStaticTime() {
-  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+window.processClassSetup = async function() {
+    const course = document.getElementById('class-course').value.trim().toUpperCase();
+    const year = document.getElementById('class-year').value;
+    const section = document.getElementById('class-section').value.trim().toUpperCase();
+    const major = document.getElementById('class-major').value.trim() || 'N/A';
+    const rawPasteData = document.getElementById('class-paste-box').value;
+
+    if (!course || !section || !rawPasteData.trim()) {
+        return showToast("Please check mandatory fields & data values!");
+    }
+
+    // THE REGEX SANITIZER CLEANUP ENGINE
+    const lines = rawPasteData.split('\n');
+    let generatedRoster = [];
+    let activeIdCounter = 1;
+
+    lines.forEach(line => {
+        let cleanName = line.trim();
+        if (!cleanName) return; // Drop whitespace empty lines
+
+        // Strip index numbering (e.g., "1. John Doe", "02) Jane", "3- Jim")
+        cleanName = cleanName.replace(/^\d+[\s\.\)\-,\/]+/g, '').trim();
+
+        if (cleanName.length > 2) {
+            generatedRoster.push({
+                id: String(activeIdCounter++),
+                name: cleanName
+            });
+        }
+    });
+
+    if (generatedRoster.length === 0) {
+        return showToast("Could not parse valid student names from input!");
+    }
+
+    const classInfoObj = { course, year, section, major };
+
+    // Commit complete master data set to Firebase environment under user UID node
+    await set(ref(db, `users/${currentUser.uid}/student_list`), generatedRoster);
+    await set(ref(db, `users/${currentUser.uid}/profile`), {
+        setupComplete: true,
+        displayName: document.getElementById('profile-name').value.trim() || currentUser.displayName,
+        classInfo: classInfoObj
+    });
+
+    currentClassInfo = classInfoObj;
+    screens.onboarding.classList.add('hidden');
+    mountMainDashboard();
+};
+
+// 5. BOOTSTRAPPING USER ATOM DATABASE PATHS
+function mountMainDashboard() {
+    screens.main.classList.remove('hidden');
+
+    // Dynamically update user interface titles based on profile configuration properties
+    const sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    document.getElementById('org-name').innerText = sectionTitle;
+    document.getElementById('class-display-badge').innerText = sectionTitle;
+    document.getElementById('org-subtitle').innerText = `Major: ${currentClassInfo.major} • Attendance System`;
+
+    const rosterRef = ref(db, `users/${currentUser.uid}/student_list`);
+    const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
+
+    // Synchronize current state logic loops
+    databaseDisconnectListener = onValue(attendanceRef, async (snapshot) => {
+        const dbData = snapshot.val();
+        
+        // Grab master file student list profile database array
+        const rosterSnapshot = await get(rosterRef);
+        const masterRoster = rosterSnapshot.val() || [];
+
+        // Alphabetize roster items by last word of structural string (Surname)
+        const sortedRoster = [...masterRoster].sort((a, b) => 
+            a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()) //
+        );
+
+        const defaultDataTemplate = sortedRoster.map(s => ({
+            ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' //
+        }));
+
+        if (!dbData) {
+            records = defaultDataTemplate;
+            set(attendanceRef, records); // Initialize record framework path
+        } else {
+            records = defaultDataTemplate.map(s => {
+                const match = dbData.find(r => r.id === s.id); //
+                return match ? match : s;
+            });
+            if (dbData.length !== records.length) set(attendanceRef, records); //
+        }
+        renderTable();
+    });
 }
 
-function showToast(msg) {
+// 6. ACTION HANDLERS & UPDATERS
+function getStaticTime() {
+  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); //
+}
+
+function showToast(msg) { //
   const t = document.getElementById('toast');
   if(t) {
     t.textContent = msg; t.classList.add('show');
@@ -88,9 +216,31 @@ function showToast(msg) {
   }
 }
 
-function updateStats() {
-  const present = records.filter(r => r.timeInChecked).length;
-  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
+window.handleTimeCheck = function(id, field, checked) { //
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
+  rec[checkedField] = checked;
+  rec[field] = checked ? getStaticTime() : '';
+  
+  const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
+  set(attendanceRef, records);
+  showToast(checked ? "Attendance Recorded" : "Attendance Removed"); //
+};
+
+window.handleManualTimeChange = function(id, field, value) { //
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    rec[field] = value;
+    
+    const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
+    set(attendanceRef, records);
+    showToast("Time Manually Updated"); //
+};
+
+function updateStats() { //
+  const present = records.filter(r => r.timeInChecked).length; //
+  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0; //
   
   const els = {
     total: document.getElementById('total-count'),
@@ -100,124 +250,131 @@ function updateStats() {
     bar: document.getElementById('rate-bar-fill')
   };
 
-  if(els.total) els.total.textContent = records.length;
-  if(els.pres) els.pres.textContent = String(present).padStart(2, '0');
-  if(els.abs) els.abs.textContent = String(records.length - present).padStart(2, '0');
-  if(els.rate) els.rate.textContent = `${rate}%`;
-  if(els.bar) els.bar.style.width = `${rate}%`;
+  if(els.total) els.total.textContent = records.length; //
+  if(els.pres) els.pres.textContent = String(present).padStart(2, '0'); //
+  if(els.abs) els.abs.textContent = String(records.length - present).padStart(2, '0'); //
+  if(els.rate) els.rate.textContent = `${rate}%`; //
+  if(els.bar) els.bar.style.width = `${rate}%`; //
 }
 
-// 5. HANDLERS
-window.handleTimeCheck = function(id, field, checked) {
-  const rec = records.find(r => r.id === id);
-  if (!rec) return;
-  const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
-  rec[checkedField] = checked;
-  rec[field] = checked ? getStaticTime() : '';
-  set(attendanceRef, records); // Save to Firebase
-  showToast(checked ? "Attendance Recorded" : "Attendance Removed");
-};
+// 7. UNDER-THE-HOOD METADATA REPORT COMPILING (FOUR-STATE CONDITIONS)
+function computeFourStateStatus(r) {
+    if (r.timeInChecked && r.timeOutChecked) {
+        return "PRESENT";
+    } else if (r.timeInChecked && !r.timeOutChecked) {
+        return "INCOMPLETE (Missing Out)";
+    } else if (!r.timeInChecked && r.timeOutChecked) {
+        return "INCOMPLETE (Missing In)";
+    } else {
+        return "ABSENT";
+    }
+}
 
-window.handleManualTimeChange = function(id, field, value) {
-    const rec = records.find(r => r.id === id);
-    if (!rec) return;
-    rec[field] = value;
-    set(attendanceRef, records);
-    showToast("Time Manually Updated");
-};
-
-window.exportCSV = function() {
-    const event = document.getElementById('event-name').value || 'Attendance';
-    let csv = "Name,Status,Time In,Time Out\n";
+window.exportCSV = function() { //
+    const event = document.getElementById('event-name').value || 'Attendance'; //
+    const sectionTitle = `${currentClassInfo.course}_${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    
+    let csv = "Name,Status,Time In,Time Out\n"; //
     records.forEach(r => {
-        csv += `"${r.name}",${r.timeInChecked ? 'PRESENT' : 'ABSENT'},${r.timeIn || '--'},${r.timeOut || '--'}\n`;
+        const calculatedStatus = computeFourStateStatus(r);
+        csv += `"${r.name}",${calculatedStatus},${r.timeIn || '--'},${r.timeOut || '--'}\n`; //
     });
     
-    const link = document.createElement("a");
-    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-    link.download = `BSIT_1C_${event}_${DATE_ID}.csv`;
-    link.click();
+    const link = document.createElement("a"); //
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); //
+    link.download = `${sectionTitle}_${event}_${DATE_ID}.csv`;
+    link.click(); //
 
-    // Trigger the reset after the download link is clicked
-    resetData();
+    resetData(); //
 };
 
-window.exportPDF = function() {
-    const eventName = document.getElementById('event-name').value || 'Attendance';
-    const img = new Image();
-    img.src = 'iict-logo.png';
-    img.onload = function() {
-        const doc = new jsPDF();
+window.exportPDF = function() { //
+    const eventName = document.getElementById('event-name').value || 'Attendance'; //
+    const sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    
+    const img = new Image(); //
+    img.src = 'iict-logo.png'; //
+    img.onload = function() { //
+        const doc = new jsPDF(); //
         
-        // Header Info
-        doc.addImage(img, 'PNG', 14, 10, 20, 20);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.setTextColor(156, 77, 185); 
-        doc.text("BSIT 1C | ATTENDANCE REPORT", 38, 20);
+        doc.addImage(img, 'PNG', 14, 10, 20, 20); //
+        doc.setFont("helvetica", "bold"); //
+        doc.setFontSize(16); //
+        doc.setTextColor(156, 77, 185);  //
+        doc.text(`${sectionTitle} | ATTENDANCE REPORT`, 38, 20);
         
-        doc.setFontSize(10);
-        doc.setTextColor(100); 
-        doc.text(`Event: ${eventName}`, 38, 27);
-        doc.text(`Date: ${DATE_ID}`, 38, 32);
+        doc.setFontSize(10); //
+        doc.setTextColor(100);  //
+        doc.text(`Event: ${eventName}`, 38, 27); //
+        doc.text(`Date: ${DATE_ID}`, 38, 32); //
 
-        const tableData = records.map(r => [
+        const tableData = records.map(r => [ //
             r.name, 
-            r.timeInChecked ? 'PRESENT' : 'ABSENT', 
+            computeFourStateStatus(r), 
             r.timeIn || '--', 
-            r.timeOut || '--'
+            r.timeOut || '--' //
         ]);
 
-        doc.autoTable({
-            startY: 40,
-            head: [['Name', 'Status', 'Time In', 'Time Out']],
-            body: tableData,
-            theme: 'grid',
-            headStyles: { fillColor: [156, 77, 185] },
-            didParseCell: function(data) {
+        doc.autoTable({ //
+            startY: 40, //
+            head: [['Name', 'Status', 'Time In', 'Time Out']], //
+            body: tableData, //
+            theme: 'grid', //
+            headStyles: { fillColor: [156, 77, 185] }, //
+            didParseCell: function(data) { //
                 if (data.section === 'body' && data.column.index === 1) {
-                    data.cell.styles.textColor = (data.cell.raw === 'PRESENT') ? [76, 175, 80] : [183, 28, 28];
+                    if (data.cell.raw === 'PRESENT') {
+                        data.cell.styles.textColor = [76, 175, 80]; // Green
+                    } else if (data.cell.raw.includes('INCOMPLETE')) {
+                        data.cell.styles.textColor = [255, 152, 0]; // Vibrant Amber/Orange
+                    } else {
+                        data.cell.styles.textColor = [183, 28, 28]; // Dark Red
+                    }
                 }
             }
         });
 
-        // Save the file
-        doc.save(`BSIT 1C ${eventName} Attendance ${DATE_ID}.pdf`);
-        
-        // Trigger the reset immediately after saving
-        resetData();
+        doc.save(`${sectionTitle} ${eventName} Attendance ${DATE_ID}.pdf`); //
+        resetData(); //
     };
 };
 
-// Add this function to your script. Ensure it is accessible
-function resetData() {
-    // 1. Create a clean version of the records array
-    const cleanedRecords = records.map(r => ({
+function resetData() { //
+    const cleanedRecords = records.map(r => ({ //
         ...r,
-        timeInChecked: false,
-        timeIn: '',
-        timeOutChecked: false,
-        timeOut: ''
+        timeInChecked: false, //
+        timeIn: '', //
+        timeOutChecked: false, //
+        timeOut: '' //
     }));
 
-    // 2. Update Firebase (This will trigger the UI to clear automatically)
-    set(attendanceRef, cleanedRecords)
-        .then(() => {
-            showToast("File Saved & Attendance Reset");
-        })
-        .catch((error) => {
-            console.error("Reset failed:", error);
-        });
+    const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
+    set(attendanceRef, cleanedRecords) //
+        .then(() => showToast("Report Saved & Session Cleared"))
+        .catch((error) => console.error("Reset structural error:", error));
 }
-// 6. RENDER
-function renderTable() {
-  const tbody = document.getElementById('student-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
 
-  records.forEach((rec) => {
-    const tr = document.createElement('tr');
-    tr.className = "hover:bg-surface-container-high transition-colors group";
+// 8. ELEMENT RENDER AND SEARCH FILTER
+window.filterStudents = function() {
+    const query = document.getElementById('student-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#student-table-body tr');
+    
+    records.forEach((rec, index) => {
+        const matches = rec.name.toLowerCase().includes(query);
+        if (rows[index]) {
+            rows[index].style.display = matches ? '' : 'none';
+        }
+    });
+};
+
+function renderTable() { //
+  const tbody = document.getElementById('student-table-body'); //
+  if (!tbody) return; //
+  tbody.innerHTML = ''; //
+
+  records.forEach((rec) => { //
+    const tr = document.createElement('tr'); //
+    tr.className = "hover:bg-surface-container-high transition-colors group"; //
     tr.innerHTML = `
       <td class="px-8 py-5">
         <div class="flex items-center">
@@ -250,38 +407,18 @@ function renderTable() {
                    onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
           </div>
         </div>
-      </td>`;
-    tbody.appendChild(tr);
+      </td>`; //
+    tbody.appendChild(tr); //
   });
-  updateStats();
+  updateStats(); //
 }
 
-// 7. INITIALIZE
-onValue(attendanceRef, (snapshot) => {
-    const dbData = snapshot.val();
-    const ideal = [...DEFAULT_STUDENTS]
-      .sort((a, b) => a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))
-      .map(s => ({ ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
-
-    if (!dbData) {
-        records = ideal;
-        set(attendanceRef, records);
-    } else {
-        records = ideal.map(s => {
-            const match = dbData.find(r => r.id === s.id);
-            return match ? match : s;
-        });
-        if (dbData.length !== records.length) set(attendanceRef, records);
-    }
-    renderTable();
-});
-
-function updateClock() {
-    const now = new Date();
-    const timeParts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split(' ');
-    document.getElementById('clock-time').innerText = timeParts[0];
-    document.getElementById('clock-ampm').innerText = timeParts[1];
-    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function updateClock() { //
+    const now = new Date(); //
+    const timeParts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split(' '); //
+    document.getElementById('clock-time').innerText = timeParts[0]; //
+    document.getElementById('clock-ampm').innerText = timeParts[1]; //
+    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); //
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(updateClock, 1000); //
+updateClock(); //
