@@ -1,6 +1,6 @@
 const { jsPDF } = window.jspdf;
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue, get } from "firebase/database";
+import { getDatabase, ref, set, onValue, get, update } from "firebase/database";
 import { 
     getAuth, 
     signInWithPopup, 
@@ -52,14 +52,20 @@ onAuthStateChanged(auth, async (user) => {
         currentUser = user;
         screens.login.classList.add('hidden');
         
+        // Push current user avatar to UI components
+        const dashboardAvatar = document.getElementById('dashboard-avatar');
+        if (dashboardAvatar) dashboardAvatar.src = user.photoURL || '';
+        document.getElementById('user-avatar').src = user.photoURL || '';
+        
         const userProfileSnapshot = await get(ref(db, `users/${user.uid}/profile`));
         const profile = userProfileSnapshot.val();
 
         if (profile && profile.setupComplete) {
             currentClassInfo = profile.classInfo;
+            // Pre-fill profile name field
+            document.getElementById('profile-name').value = profile.displayName || user.displayName || '';
             mountMainDashboard();
         } else {
-            document.getElementById('user-avatar').src = user.photoURL || '';
             document.getElementById('profile-name').value = user.displayName || '';
             
             screens.onboarding.classList.remove('hidden');
@@ -110,26 +116,34 @@ window.processClassSetup = async function() {
     const section = document.getElementById('class-section').value.trim().toUpperCase();
     const major = document.getElementById('class-major').value.trim() || 'N/A';
     const rawPasteData = document.getElementById('class-paste-box').value;
+    const updatedProfileName = document.getElementById('profile-name').value.trim();
 
-    if (!course || !section || !rawPasteData.trim()) {
+    if (!course || !section || !rawPasteData.trim() || !updatedProfileName) {
         return showToast("Please check mandatory fields & data values!");
     }
 
     const lines = rawPasteData.split('\n');
     let generatedRoster = [];
-    let activeIdCounter = 1;
 
     lines.forEach(line => {
         let cleanName = line.trim();
         if (!cleanName) return; 
 
+        // Strip index numbering (e.g., "1. John Doe", "02) Jane")
         cleanName = cleanName.replace(/^\d+[\s\.\)\-,\/]+/g, '').trim();
 
         if (cleanName.length > 2) {
-            generatedRoster.push({
-                id: String(activeIdCounter++),
-                name: cleanName
-            });
+            // FIX: Create a unique, deterministic ID based on the lowercased alphanumeric name.
+            // This prevents key assignment shifting during sorting.
+            const uniqueId = `student_${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            
+            // Check for explicit duplicate inputs within the paste box entry
+            if (!generatedRoster.some(s => s.id === uniqueId)) {
+                generatedRoster.push({
+                    id: uniqueId,
+                    name: cleanName
+                });
+            }
         }
     });
 
@@ -139,10 +153,11 @@ window.processClassSetup = async function() {
 
     const classInfoObj = { course, year, section, major };
 
+    // Atomically commit master student profiles and demographic blocks
     await set(ref(db, `users/${currentUser.uid}/student_list`), generatedRoster);
     await set(ref(db, `users/${currentUser.uid}/profile`), {
         setupComplete: true,
-        displayName: document.getElementById('profile-name').value.trim() || currentUser.displayName,
+        displayName: updatedProfileName,
         classInfo: classInfoObj
     });
 
@@ -163,12 +178,15 @@ function mountMainDashboard() {
     const rosterRef = ref(db, `users/${currentUser.uid}/student_list`);
     const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
 
+    if (databaseDisconnectListener) databaseDisconnectListener();
+
     databaseDisconnectListener = onValue(attendanceRef, async (snapshot) => {
         const dbData = snapshot.val();
         
         const rosterSnapshot = await get(rosterRef);
         const masterRoster = rosterSnapshot.val() || [];
 
+        // Alphabetize roster items safely by last word string segments
         const sortedRoster = [...masterRoster].sort((a, b) => 
             a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()) 
         );
@@ -181,11 +199,18 @@ function mountMainDashboard() {
             records = defaultDataTemplate;
             set(attendanceRef, records); 
         } else {
+            // FIX: Map database matches using our stable string IDs
             records = defaultDataTemplate.map(s => {
                 const match = dbData.find(r => r.id === s.id); 
-                return match ? match : s;
+                return match ? { ...s, ...match } : s;
             });
-            if (dbData.length !== records.length) set(attendanceRef, records); 
+            
+            // Clean dynamic structural sizing modifications seamlessly
+            const structuralCheck = dbData.map(r => r.id).join(',');
+            const currentCheck = records.map(r => r.id).join(',');
+            if (structuralCheck !== currentCheck) {
+                set(attendanceRef, records);
+            }
         }
         renderTable();
     });
@@ -260,7 +285,12 @@ function computeFourStateStatus(r) {
 
 window.exportCSV = function() { 
     const event = document.getElementById('event-name').value || 'Attendance'; 
-    const sectionTitle = `${currentClassInfo.course}_${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    
+    // Build identical clean naming for file download tracking
+    let sectionFileTitle = `${currentClassInfo.course}_${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    if (currentClassInfo.major && currentClassInfo.major !== 'N/A') {
+        sectionFileTitle += `_${currentClassInfo.major.replace(/\s+/g, '_').toUpperCase()}`;
+    }
     
     let csv = "Name,Status,Time In,Time Out\n"; 
     records.forEach(r => {
@@ -270,7 +300,7 @@ window.exportCSV = function() {
     
     const link = document.createElement("a"); 
     link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); 
-    link.download = `${sectionTitle}_${event}_${DATE_ID}.csv`;
+    link.download = `${sectionFileTitle}_${event}_${DATE_ID}.csv`;
     link.click(); 
 
     window.resetData(); 
@@ -278,7 +308,12 @@ window.exportCSV = function() {
 
 window.exportPDF = function() { 
     const eventName = document.getElementById('event-name').value || 'Attendance'; 
-    const sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    
+    // Compile a dynamic, adaptive title string based on whether a Major is active
+    let sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
+    if (currentClassInfo.major && currentClassInfo.major !== 'N/A') {
+        sectionTitle += ` ${currentClassInfo.major.toUpperCase()}`;
+    }
     
     const img = new Image(); 
     img.src = 'iict-logo.png'; 
@@ -289,6 +324,8 @@ window.exportPDF = function() {
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(16); 
         doc.setTextColor(156, 77, 185);  
+        
+        // This will now print: "BSIT 2C WEB | ATTENDANCE REPORT"
         doc.text(`${sectionTitle} | ATTENDANCE REPORT`, 38, 20);
         
         doc.setFontSize(10); 
@@ -322,6 +359,7 @@ window.exportPDF = function() {
             }
         });
 
+        // Save the file with the optimized name formatting
         doc.save(`${sectionTitle} ${eventName} Attendance ${DATE_ID}.pdf`); 
         window.resetData(); 
     };
@@ -415,10 +453,13 @@ updateClock();
 window.openSettingsOverlay = function() {
     if (!currentUser || !currentClassInfo) return;
 
-    // Open setup overlay layout blocks directly to step 2 configuration panel
+    // Open setup overlay but ensure step-1 (profile name field layout) is visible as well!
     document.getElementById('onboarding-screen').classList.remove('hidden');
-    document.getElementById('onboarding-step-1').classList.add('hidden'); 
+    document.getElementById('onboarding-step-1').classList.remove('hidden'); 
     document.getElementById('onboarding-step-2').classList.remove('hidden'); 
+
+    // Update avatar image
+    document.getElementById('user-avatar').src = currentUser.photoURL || '';
 
     // Sync state settings fields back into views
     document.getElementById('class-course').value = currentClassInfo.course || '';
