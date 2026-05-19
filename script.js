@@ -26,10 +26,10 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 // 2. STATE ENVIRONMENT CONTROLLERS
-const DATE_ID = new Date().toISOString().slice(0, 10); //
+const DATE_ID = new Date().toISOString().slice(0, 10);
 let currentUser = null;
 let currentClassInfo = null;
-let records = []; //
+let records = []; 
 let databaseDisconnectListener = null;
 
 // DOM View Targets
@@ -43,7 +43,6 @@ const screens = {
 
 // 3. SECURE AUTHENTICATION HUB
 onAuthStateChanged(auth, async (user) => {
-    // Teardown any existing active listeners to avoid multi-user memory bleed
     if (databaseDisconnectListener) {
         databaseDisconnectListener();
         databaseDisconnectListener = null;
@@ -53,16 +52,13 @@ onAuthStateChanged(auth, async (user) => {
         currentUser = user;
         screens.login.classList.add('hidden');
         
-        // Query profile metadata to see if onboarding setup is complete
         const userProfileSnapshot = await get(ref(db, `users/${user.uid}/profile`));
         const profile = userProfileSnapshot.val();
 
         if (profile && profile.setupComplete) {
-            // Profile exists! Bootstrap the main portal interface
             currentClassInfo = profile.classInfo;
             mountMainDashboard();
         } else {
-            // New account: Init step 1 profile pre-fill views
             document.getElementById('user-avatar').src = user.photoURL || '';
             document.getElementById('profile-name').value = user.displayName || '';
             
@@ -74,7 +70,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         currentUser = null;
         currentClassInfo = null;
-        records = []; //
+        records = []; 
         screens.login.classList.remove('hidden');
         screens.onboarding.classList.add('hidden');
         screens.main.classList.add('hidden');
@@ -90,7 +86,7 @@ window.handleGoogleLogin = function() {
 };
 
 window.handleLogout = function() {
-    signOut(auth).then(() => showToast("Session Closed")); //
+    signOut(auth).then(() => showToast("Session Closed")); 
 };
 
 // 4. ONBOARDING & MOBILE CLIPBOARD SANITIZER
@@ -103,7 +99,6 @@ window.saveProfileCustomization = async function() {
     const updatedName = document.getElementById('profile-name').value.trim();
     if (!updatedName) return showToast("Name field cannot be blank");
     
-    // Partially write data and proceed to Class Configuration
     await set(ref(db, `users/${currentUser.uid}/profile/name`), updatedName);
     screens.step1.classList.add('hidden');
     screens.step2.classList.remove('hidden');
@@ -120,16 +115,14 @@ window.processClassSetup = async function() {
         return showToast("Please check mandatory fields & data values!");
     }
 
-    // THE REGEX SANITIZER CLEANUP ENGINE
     const lines = rawPasteData.split('\n');
     let generatedRoster = [];
     let activeIdCounter = 1;
 
     lines.forEach(line => {
         let cleanName = line.trim();
-        if (!cleanName) return; // Drop whitespace empty lines
+        if (!cleanName) return; 
 
-        // Strip index numbering (e.g., "1. John Doe", "02) Jane", "3- Jim")
         cleanName = cleanName.replace(/^\d+[\s\.\)\-,\/]+/g, '').trim();
 
         if (cleanName.length > 2) {
@@ -146,7 +139,6 @@ window.processClassSetup = async function() {
 
     const classInfoObj = { course, year, section, major };
 
-    // Commit complete master data set to Firebase environment under user UID node
     await set(ref(db, `users/${currentUser.uid}/student_list`), generatedRoster);
     await set(ref(db, `users/${currentUser.uid}/profile`), {
         setupComplete: true,
@@ -163,7 +155,6 @@ window.processClassSetup = async function() {
 function mountMainDashboard() {
     screens.main.classList.remove('hidden');
 
-    // Dynamically update user interface titles based on profile configuration properties
     const sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
     document.getElementById('org-name').innerText = sectionTitle;
     document.getElementById('class-display-badge').innerText = sectionTitle;
@@ -172,32 +163,29 @@ function mountMainDashboard() {
     const rosterRef = ref(db, `users/${currentUser.uid}/student_list`);
     const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
 
-    // Synchronize current state logic loops
     databaseDisconnectListener = onValue(attendanceRef, async (snapshot) => {
         const dbData = snapshot.val();
         
-        // Grab master file student list profile database array
         const rosterSnapshot = await get(rosterRef);
         const masterRoster = rosterSnapshot.val() || [];
 
-        // Alphabetize roster items by last word of structural string (Surname)
         const sortedRoster = [...masterRoster].sort((a, b) => 
-            a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()) //
+            a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()) 
         );
 
         const defaultDataTemplate = sortedRoster.map(s => ({
-            ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' //
+            ...s, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' 
         }));
 
         if (!dbData) {
             records = defaultDataTemplate;
-            set(attendanceRef, records); // Initialize record framework path
+            set(attendanceRef, records); 
         } else {
             records = defaultDataTemplate.map(s => {
-                const match = dbData.find(r => r.id === s.id); //
+                const match = dbData.find(r => r.id === s.id); 
                 return match ? match : s;
             });
-            if (dbData.length !== records.length) set(attendanceRef, records); //
+            if (dbData.length !== records.length) set(attendanceRef, records); 
         }
         renderTable();
     });
@@ -205,10 +193,10 @@ function mountMainDashboard() {
 
 // 6. ACTION HANDLERS & UPDATERS
 function getStaticTime() {
-  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); //
+  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); 
 }
 
-function showToast(msg) { //
+function showToast(msg) { 
   const t = document.getElementById('toast');
   if(t) {
     t.textContent = msg; t.classList.add('show');
@@ -216,7 +204,7 @@ function showToast(msg) { //
   }
 }
 
-window.handleTimeCheck = function(id, field, checked) { //
+window.handleTimeCheck = function(id, field, checked) { 
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   const checkedField = field === 'timeIn' ? 'timeInChecked' : 'timeOutChecked';
@@ -225,22 +213,22 @@ window.handleTimeCheck = function(id, field, checked) { //
   
   const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
   set(attendanceRef, records);
-  showToast(checked ? "Attendance Recorded" : "Attendance Removed"); //
+  showToast(checked ? "Attendance Recorded" : "Attendance Removed"); 
 };
 
-window.handleManualTimeChange = function(id, field, value) { //
+window.handleManualTimeChange = function(id, field, value) { 
     const rec = records.find(r => r.id === id);
     if (!rec) return;
     rec[field] = value;
     
     const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
     set(attendanceRef, records);
-    showToast("Time Manually Updated"); //
+    showToast("Time Manually Updated"); 
 };
 
-function updateStats() { //
-  const present = records.filter(r => r.timeInChecked).length; //
-  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0; //
+function updateStats() { 
+  const present = records.filter(r => r.timeInChecked).length; 
+  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0; 
   
   const els = {
     total: document.getElementById('total-count'),
@@ -250,14 +238,14 @@ function updateStats() { //
     bar: document.getElementById('rate-bar-fill')
   };
 
-  if(els.total) els.total.textContent = records.length; //
-  if(els.pres) els.pres.textContent = String(present).padStart(2, '0'); //
-  if(els.abs) els.abs.textContent = String(records.length - present).padStart(2, '0'); //
-  if(els.rate) els.rate.textContent = `${rate}%`; //
-  if(els.bar) els.bar.style.width = `${rate}%`; //
+  if(els.total) els.total.textContent = records.length; 
+  if(els.pres) els.pres.textContent = String(present).padStart(2, '0'); 
+  if(els.abs) els.abs.textContent = String(records.length - present).padStart(2, '0'); 
+  if(els.rate) els.rate.textContent = `${rate}%`; 
+  if(els.bar) els.bar.style.width = `${rate}%`; 
 }
 
-// 7. UNDER-THE-HOOD METADATA REPORT COMPILING (FOUR-STATE CONDITIONS)
+// 7. REPORT COMPILING & RESET ACTIONS
 function computeFourStateStatus(r) {
     if (r.timeInChecked && r.timeOutChecked) {
         return "PRESENT";
@@ -270,89 +258,89 @@ function computeFourStateStatus(r) {
     }
 }
 
-window.exportCSV = function() { //
-    const event = document.getElementById('event-name').value || 'Attendance'; //
+window.exportCSV = function() { 
+    const event = document.getElementById('event-name').value || 'Attendance'; 
     const sectionTitle = `${currentClassInfo.course}_${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
     
-    let csv = "Name,Status,Time In,Time Out\n"; //
+    let csv = "Name,Status,Time In,Time Out\n"; 
     records.forEach(r => {
         const calculatedStatus = computeFourStateStatus(r);
-        csv += `"${r.name}",${calculatedStatus},${r.timeIn || '--'},${r.timeOut || '--'}\n`; //
+        csv += `"${r.name}",${calculatedStatus},${r.timeIn || '--'},${r.timeOut || '--'}\n`; 
     });
     
-    const link = document.createElement("a"); //
-    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); //
+    const link = document.createElement("a"); 
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); 
     link.download = `${sectionTitle}_${event}_${DATE_ID}.csv`;
-    link.click(); //
+    link.click(); 
 
-    resetData(); //
+    window.resetData(); 
 };
 
-window.exportPDF = function() { //
-    const eventName = document.getElementById('event-name').value || 'Attendance'; //
+window.exportPDF = function() { 
+    const eventName = document.getElementById('event-name').value || 'Attendance'; 
     const sectionTitle = `${currentClassInfo.course} ${currentClassInfo.year.charAt(0)}${currentClassInfo.section}`;
     
-    const img = new Image(); //
-    img.src = 'iict-logo.png'; //
-    img.onload = function() { //
-        const doc = new jsPDF(); //
+    const img = new Image(); 
+    img.src = 'iict-logo.png'; 
+    img.onload = function() { 
+        const doc = new jsPDF(); 
         
-        doc.addImage(img, 'PNG', 14, 10, 20, 20); //
-        doc.setFont("helvetica", "bold"); //
-        doc.setFontSize(16); //
-        doc.setTextColor(156, 77, 185);  //
+        doc.addImage(img, 'PNG', 14, 10, 20, 20); 
+        doc.setFont("helvetica", "bold"); 
+        doc.setFontSize(16); 
+        doc.setTextColor(156, 77, 185);  
         doc.text(`${sectionTitle} | ATTENDANCE REPORT`, 38, 20);
         
-        doc.setFontSize(10); //
-        doc.setTextColor(100);  //
-        doc.text(`Event: ${eventName}`, 38, 27); //
-        doc.text(`Date: ${DATE_ID}`, 38, 32); //
+        doc.setFontSize(10); 
+        doc.setTextColor(100);  
+        doc.text(`Event: ${eventName}`, 38, 27); 
+        doc.text(`Date: ${DATE_ID}`, 38, 32); 
 
-        const tableData = records.map(r => [ //
+        const tableData = records.map(r => [ 
             r.name, 
             computeFourStateStatus(r), 
             r.timeIn || '--', 
-            r.timeOut || '--' //
+            r.timeOut || '--' 
         ]);
 
-        doc.autoTable({ //
-            startY: 40, //
-            head: [['Name', 'Status', 'Time In', 'Time Out']], //
-            body: tableData, //
-            theme: 'grid', //
-            headStyles: { fillColor: [156, 77, 185] }, //
-            didParseCell: function(data) { //
+        doc.autoTable({ 
+            startY: 40, 
+            head: [['Name', 'Status', 'Time In', 'Time Out']], 
+            body: tableData, 
+            theme: 'grid', 
+            headStyles: { fillColor: [156, 77, 185] }, 
+            didParseCell: function(data) { 
                 if (data.section === 'body' && data.column.index === 1) {
                     if (data.cell.raw === 'PRESENT') {
-                        data.cell.styles.textColor = [76, 175, 80]; // Green
+                        data.cell.styles.textColor = [76, 175, 80]; 
                     } else if (data.cell.raw.includes('INCOMPLETE')) {
-                        data.cell.styles.textColor = [255, 152, 0]; // Vibrant Amber/Orange
+                        data.cell.styles.textColor = [255, 152, 0]; 
                     } else {
-                        data.cell.styles.textColor = [183, 28, 28]; // Dark Red
+                        data.cell.styles.textColor = [183, 28, 28]; 
                     }
                 }
             }
         });
 
-        doc.save(`${sectionTitle} ${eventName} Attendance ${DATE_ID}.pdf`); //
-        resetData(); //
+        doc.save(`${sectionTitle} ${eventName} Attendance ${DATE_ID}.pdf`); 
+        window.resetData(); 
     };
 };
 
-function resetData() { //
-    const cleanedRecords = records.map(r => ({ //
+window.resetData = function() { 
+    const cleanedRecords = records.map(r => ({ 
         ...r,
-        timeInChecked: false, //
-        timeIn: '', //
-        timeOutChecked: false, //
-        timeOut: '' //
+        timeInChecked: false, 
+        timeIn: '', 
+        timeOutChecked: false, 
+        timeOut: '' 
     }));
 
     const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
-    set(attendanceRef, cleanedRecords) //
+    set(attendanceRef, cleanedRecords) 
         .then(() => showToast("Report Saved & Session Cleared"))
         .catch((error) => console.error("Reset structural error:", error));
-}
+};
 
 // 8. ELEMENT RENDER AND SEARCH FILTER
 window.filterStudents = function() {
@@ -367,14 +355,14 @@ window.filterStudents = function() {
     });
 };
 
-function renderTable() { //
-  const tbody = document.getElementById('student-table-body'); //
-  if (!tbody) return; //
-  tbody.innerHTML = ''; //
+function renderTable() { 
+  const tbody = document.getElementById('student-table-body'); 
+  if (!tbody) return; 
+  tbody.innerHTML = ''; 
 
-  records.forEach((rec) => { //
-    const tr = document.createElement('tr'); //
-    tr.className = "hover:bg-surface-container-high transition-colors group"; //
+  records.forEach((rec) => { 
+    const tr = document.createElement('tr'); 
+    tr.className = "hover:bg-surface-container-high transition-colors group"; 
     tr.innerHTML = `
       <td class="px-8 py-5">
         <div class="flex items-center">
@@ -407,18 +395,50 @@ function renderTable() { //
                    onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
           </div>
         </div>
-      </td>`; //
-    tbody.appendChild(tr); //
+      </td>`; 
+    tbody.appendChild(tr); 
   });
-  updateStats(); //
+  updateStats(); 
 }
 
-function updateClock() { //
-    const now = new Date(); //
-    const timeParts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split(' '); //
-    document.getElementById('clock-time').innerText = timeParts[0]; //
-    document.getElementById('clock-ampm').innerText = timeParts[1]; //
-    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); //
+function updateClock() { 
+    const now = new Date(); 
+    const timeParts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split(' '); 
+    document.getElementById('clock-time').innerText = timeParts[0]; 
+    document.getElementById('clock-ampm').innerText = timeParts[1]; 
+    document.getElementById('clock-date').innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); 
 }
-setInterval(updateClock, 1000); //
-updateClock(); //
+setInterval(updateClock, 1000);
+updateClock();
+
+// 9. DYNAMIC RUNTIME PROFILE SETTINGS ADJUSTMENTS
+window.openSettingsOverlay = function() {
+    if (!currentUser || !currentClassInfo) return;
+
+    // Open setup overlay layout blocks directly to step 2 configuration panel
+    document.getElementById('onboarding-screen').classList.remove('hidden');
+    document.getElementById('onboarding-step-1').classList.add('hidden'); 
+    document.getElementById('onboarding-step-2').classList.remove('hidden'); 
+
+    // Sync state settings fields back into views
+    document.getElementById('class-course').value = currentClassInfo.course || '';
+    document.getElementById('class-year').value = currentClassInfo.year || '1st';
+    document.getElementById('class-section').value = currentClassInfo.section || '';
+    document.getElementById('class-major').value = currentClassInfo.major || 'N/A';
+
+    // Reverse array mapping to dump names back into text entry area cleanly
+    if (records && records.length > 0) {
+        const textRosterList = records.map((r, i) => `${i + 1}. ${r.name}`).join('\n');
+        document.getElementById('class-paste-box').value = textRosterList;
+    } else {
+        document.getElementById('class-paste-box').value = '';
+    }
+
+    // Show cancel button element safely
+    const cancelBtn = document.getElementById('cancel-settings-btn');
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+};
+
+window.closeSettingsOverlay = function() {
+    document.getElementById('onboarding-screen').classList.add('hidden');
+};
