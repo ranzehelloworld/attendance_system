@@ -31,9 +31,8 @@ let currentUser = null;
 let currentClassInfo = null;
 let records = []; 
 let databaseDisconnectListener = null;
-let customAvatarBase64 = null; // Stores uploaded image raw data locally
+let customAvatarBase64 = null; 
 
-// DOM View Targets
 const screens = {
     login: document.getElementById('login-screen'),
     onboarding: document.getElementById('onboarding-screen'),
@@ -57,7 +56,6 @@ onAuthStateChanged(auth, async (user) => {
         if (profile && profile.setupComplete) {
             currentClassInfo = profile.classInfo;
             
-            // Render profile image from database fallback to Google Auth photo
             const activeAvatar = profile.avatarString || user.photoURL || '';
             const dashboardAvatar = document.getElementById('dashboard-avatar');
             if (dashboardAvatar) dashboardAvatar.src = activeAvatar;
@@ -66,9 +64,15 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById('profile-name').value = profile.displayName || user.displayName || '';
             mountMainDashboard();
         } else {
-            // Fresh account onboarding fallbacks
+            // SHOW CONFIGURATION CONTAINER FIELDS FOR FIRST TIME REGISTRATION ON LOGIN
             document.getElementById('user-avatar').src = user.photoURL || '';
             document.getElementById('profile-name').value = user.displayName || '';
+            
+            document.getElementById('settings-title-header').innerText = "Register Your Class";
+            document.getElementById('settings-subtitle-description').innerText = "Configure initial class setup parameters and account values";
+            document.getElementById('class-config-fields').classList.remove('hidden');
+            document.getElementById('cancel-settings-btn').classList.add('hidden');
+            document.getElementById('save-btn-text').innerText = "Complete Application Setup";
             
             screens.onboarding.classList.remove('hidden');
             screens.main.classList.add('hidden');
@@ -128,18 +132,13 @@ window.processClassSetup = async function() {
         let cleanName = line.trim();
         if (!cleanName) return; 
 
-        // Strip index numbers / symbols (e.g., "1. John Doe", "02) Jane")
+        // Strip index numbers cleanly (e.g. "1. Jane Doe" -> "Jane Doe")
         cleanName = cleanName.replace(/^\d+[\s\.\)\-,\/]+/g, '').trim();
 
         if (cleanName.length > 2) {
-            // Generate deterministic unique id tracking key 
             const uniqueId = `student_${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-            
             if (!generatedRoster.some(s => s.id === uniqueId)) {
-                generatedRoster.push({
-                    id: uniqueId,
-                    name: cleanName
-                });
+                generatedRoster.push({ id: uniqueId, name: cleanName });
             }
         }
     });
@@ -148,19 +147,26 @@ window.processClassSetup = async function() {
         return showToast("Could not parse valid student names from input!");
     }
 
-    // Preserve metadata values safely if adjusting fields from runtime dashboard settings
-    const course = currentClassInfo?.course || "BSIT";
-    const year = currentClassInfo?.year || "1st";
-    const section = currentClassInfo?.section || "A";
-    const major = currentClassInfo?.major || "N/A";
+    // Capture values dynamically if container visible, else retain fallback database states securely
+    let course = currentClassInfo?.course || "BSIT";
+    let year = currentClassInfo?.year || "1st";
+    let section = currentClassInfo?.section || "A";
+    let major = currentClassInfo?.major || "N/A";
+
+    const configContainerVisible = !document.getElementById('class-config-fields').classList.contains('hidden');
+    if (configContainerVisible) {
+        course = document.getElementById('class-course').value.trim().toUpperCase() || course;
+        year = document.getElementById('class-year').value || year;
+        section = document.getElementById('class-section').value.trim().toUpperCase() || section;
+        major = document.getElementById('class-major').value || major;
+    }
+
     const classInfoObj = { course, year, section, major };
 
-    // Fetch existing profile to retain active avatar image string if no new file uploaded
     const currentProfileSnap = await get(ref(db, `users/${currentUser.uid}/profile`));
     const currentProfileData = currentProfileSnap.val() || {};
     const finalAvatar = customAvatarBase64 || currentProfileData.avatarString || currentUser.photoURL || '';
 
-    // Atomically commit master datasets to Firebase environment
     await set(ref(db, `users/${currentUser.uid}/student_list`), generatedRoster);
     await set(ref(db, `users/${currentUser.uid}/profile`), {
         setupComplete: true,
@@ -169,7 +175,6 @@ window.processClassSetup = async function() {
         classInfo: classInfoObj
     });
 
-    // Mirror current profile state adjustments to UI headers dynamically
     const dashboardAvatar = document.getElementById('dashboard-avatar');
     if (dashboardAvatar) dashboardAvatar.src = finalAvatar;
 
@@ -199,7 +204,6 @@ function mountMainDashboard() {
         const rosterSnapshot = await get(rosterRef);
         const masterRoster = rosterSnapshot.val() || [];
 
-        // Alphabetize roster items by structural surname word segment
         const sortedRoster = [...masterRoster].sort((a, b) => 
             a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()) 
         );
@@ -281,17 +285,11 @@ function updateStats() {
   if(els.bar) els.bar.style.width = `${rate}%`; 
 }
 
-// 8. REPORT COMPILING & RESET ACTIONS
 function computeFourStateStatus(r) {
-    if (r.timeInChecked && r.timeOutChecked) {
-        return "PRESENT";
-    } else if (r.timeInChecked && !r.timeOutChecked) {
-        return "INCOMPLETE (Missing Out)";
-    } else if (!r.timeInChecked && r.timeOutChecked) {
-        return "INCOMPLETE (Missing In)";
-    } else {
-        return "ABSENT";
-    }
+    if (r.timeInChecked && r.timeOutChecked) return "PRESENT";
+    if (r.timeInChecked && !r.timeOutChecked) return "INCOMPLETE (Missing Out)";
+    if (!r.timeInChecked && r.timeOutChecked) return "INCOMPLETE (Missing In)";
+    return "ABSENT";
 }
 
 window.exportCSV = function() { 
@@ -303,15 +301,13 @@ window.exportCSV = function() {
     
     let csv = "Name,Status,Time In,Time Out\n"; 
     records.forEach(r => {
-        const calculatedStatus = computeFourStateStatus(r);
-        csv += `"${r.name}",${calculatedStatus},${r.timeIn || '--'},${r.timeOut || '--'}\n`; 
+        csv += `"${r.name}",${computeFourStateStatus(r)},${r.timeIn || '--'},${r.timeOut || '--'}\n`; 
     });
     
     const link = document.createElement("a"); 
     link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); 
     link.download = `${sectionFileTitle}_${event}_${DATE_ID}.csv`;
     link.click(); 
-
     window.resetData(); 
 };
 
@@ -326,7 +322,6 @@ window.exportPDF = function() {
     img.src = 'iict-logo.png'; 
     img.onload = function() { 
         const doc = new jsPDF(); 
-        
         doc.addImage(img, 'PNG', 14, 10, 20, 20); 
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(16); 
@@ -338,12 +333,7 @@ window.exportPDF = function() {
         doc.text(`Event: ${eventName}`, 38, 27); 
         doc.text(`Date: ${DATE_ID}`, 38, 32); 
 
-        const tableData = records.map(r => [ 
-            r.name, 
-            computeFourStateStatus(r), 
-            r.timeIn || '--', 
-            r.timeOut || '--' 
-        ]);
+        const tableData = records.map(r => [r.name, computeFourStateStatus(r), r.timeIn || '--', r.timeOut || '--']);
 
         doc.autoTable({ 
             startY: 40, 
@@ -353,13 +343,9 @@ window.exportPDF = function() {
             headStyles: { fillColor: [156, 77, 185] }, 
             didParseCell: function(data) { 
                 if (data.section === 'body' && data.column.index === 1) {
-                    if (data.cell.raw === 'PRESENT') {
-                        data.cell.styles.textColor = [76, 175, 80]; 
-                    } else if (data.cell.raw.includes('INCOMPLETE')) {
-                        data.cell.styles.textColor = [255, 152, 0]; 
-                    } else {
-                        data.cell.styles.textColor = [183, 28, 28]; 
-                    }
+                    if (data.cell.raw === 'PRESENT') data.cell.styles.textColor = [76, 175, 80]; 
+                    else if (data.cell.raw.includes('INCOMPLETE')) data.cell.styles.textColor = [255, 152, 0]; 
+                    else data.cell.styles.textColor = [183, 28, 28]; 
                 }
             }
         });
@@ -370,30 +356,17 @@ window.exportPDF = function() {
 };
 
 window.resetData = function() { 
-    const cleanedRecords = records.map(r => ({ 
-        ...r,
-        timeInChecked: false, 
-        timeIn: '', 
-        timeOutChecked: false, 
-        timeOut: '' 
-    }));
-
-    const attendanceRef = ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`);
-    set(attendanceRef, cleanedRecords) 
-        .then(() => showToast("Report Saved & Session Cleared"))
-        .catch((error) => console.error("Reset structural error:", error));
+    const cleanedRecords = records.map(r => ({ ...r, timeInChecked: false, timeIn: '', timeOutChecked: false, timeOut: '' }));
+    set(ref(db, `users/${currentUser.uid}/attendance/${DATE_ID}`), cleanedRecords) 
+        .then(() => showToast("Report Saved & Session Cleared"));
 };
 
-// 9. ELEMENT RENDER AND SEARCH FILTER
 window.filterStudents = function() {
     const query = document.getElementById('student-search').value.toLowerCase();
     const rows = document.querySelectorAll('#student-table-body tr');
-    
     records.forEach((rec, index) => {
         const matches = rec.name.toLowerCase().includes(query);
-        if (rows[index]) {
-            rows[index].style.display = matches ? '' : 'none';
-        }
+        if (rows[index]) rows[index].style.display = matches ? '' : 'none';
     });
 };
 
@@ -422,9 +395,7 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeInChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeIn', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
-            <input type="text" value="${rec.timeIn || '--'}" 
-                   class="bg-transparent border-none text-[0.7rem] text-secondary font-mono w-20 p-0 text-center focus:ring-0"
-                   onchange="window.handleManualTimeChange('${rec.id}', 'timeIn', this.value)">
+            <input type="text" value="${rec.timeIn || '--'}" class="bg-transparent border-none text-[0.7rem] text-secondary font-mono w-20 p-0 text-center focus:ring-0" onchange="window.handleManualTimeChange('${rec.id}', 'timeIn', this.value)">
           </div>
           <div class="flex flex-col items-center gap-1">
             <span class="text-[0.5rem] text-outline uppercase">Out</span>
@@ -432,9 +403,7 @@ function renderTable() {
               <input type="checkbox" class="sr-only peer" ${rec.timeOutChecked ? 'checked' : ''} onchange="window.handleTimeCheck('${rec.id}', 'timeOut', this.checked)">
               <div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tertiary"></div>
             </label>
-            <input type="text" value="${rec.timeOut || '--'}" 
-                   class="bg-transparent border-none text-[0.7rem] text-on-surface-variant font-mono w-20 p-0 text-center focus:ring-0"
-                   onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
+            <input type="text" value="${rec.timeOut || '--'}" class="bg-transparent border-none text-[0.7rem] text-on-surface-variant font-mono w-20 p-0 text-center focus:ring-0" onchange="window.handleManualTimeChange('${rec.id}', 'timeOut', this.value)">
           </div>
         </div>
       </td>`; 
@@ -453,31 +422,32 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
-// 9. RUNTIME OVERLAY ROUTINES
+// 8. OVERLAY DISPLAY CONFIGURATORS
 window.openSettingsOverlay = async function() {
     if (!currentUser) return;
 
-    // Open configuration layout container smoothly
     document.getElementById('onboarding-screen').classList.remove('hidden');
 
     const userProfileSnapshot = await get(ref(db, `users/${currentUser.uid}/profile`));
     const profile = userProfileSnapshot.val() || {};
 
-    // Pull current user info into inputs
     document.getElementById('profile-name').value = profile.displayName || currentUser.displayName || '';
     document.getElementById('user-avatar').src = profile.avatarString || currentUser.photoURL || '';
     customAvatarBase64 = null; 
 
-    // REMOVE INDEX NUMBERING: Formats names as a clean, line-by-line list
+    // HIDE THE CLASS CONFIG FIELDS SINCE WE ARE LAUNCHING FROM RUNTIME DASHBOARD
+    document.getElementById('settings-title-header').innerText = "Update Your Profile";
+    document.getElementById('settings-subtitle-description').innerText = "Modify profile presentation configurations and student roster entries";
+    document.getElementById('class-config-fields').classList.add('hidden');
+    document.getElementById('cancel-settings-btn').classList.remove('hidden');
+    document.getElementById('save-btn-text').innerText = "Save Settings Updates";
+
+    // EXPORT RAW NAMES WITHOUT INDICES
     if (records && records.length > 0) {
-        const clearRosterList = records.map(r => r.name).join('\n');
-        document.getElementById('class-paste-box').value = clearRosterList;
+        document.getElementById('class-paste-box').value = records.map(r => r.name).join('\n');
     } else {
         document.getElementById('class-paste-box').value = '';
     }
-
-    const cancelBtn = document.getElementById('cancel-settings-btn');
-    if (cancelBtn) cancelBtn.classList.remove('hidden');
 };
 
 window.closeSettingsOverlay = function() {
